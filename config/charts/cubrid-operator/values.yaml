@@ -1,0 +1,106 @@
+# Default values for cubrid-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: airnet73/operator
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+namespace: "cubrid"
+
+
+# -- Whether the operator should watch CRDs only in its own namespace or not.
+currentNamespaceOnly: false
+
+
+# cubrid operator 
+operator:
+  enabled: true
+  serviceAccount:
+    enabled: true
+    name: ""
+  clusterRoleName:
+    name: ""
+  clusterRoleBindingName:
+    name: ""
+  electionRoleName:
+    name: ""
+  electionRoleBindingName:
+    name: ""
+  cubriddbEditClusterRoleName: 
+    name: ""
+  cubriddbViewClusterRoleName: 
+    name: ""
+  backupdbEditClusterRoleName:
+    name: ""
+  backupdbViewClusterRoleName:
+    name: ""
+  
+
+
+
+
+
+# Webhook Configurations
+webhook:
+  # -- Specifies whether the webhook should be created.
+  enabled: true
+  cabundle: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNvRENDQWdtZ0F3SUJBZ0lKQUlNWEwzdUMyUGVvTUEwR0NTcUdTSWIzRFFFQkN3VUFNR2t4Q3pBSkJnTlYKQkFZVEFrdFBNUTR3REFZRFZRUUlEQVZMVDFKRlFURU9NQXdHQTFVRUJ3d0ZVMFZQVlV3eER6QU5CZ05WQkFvTQpCa05WUWxKSlJERVBNQTBHQTFVRUN3d0dZM1ZpY21sa01SZ3dGZ1lEVlFRRERBOURWVUpTU1VRZ1QzQmxjbUYwCmIzSXdIaGNOTWpReE1URXlNRFV5TkRFd1doY05NelF4TVRFd01EVXlOREV3V2pCcE1Rc3dDUVlEVlFRR0V3SkwKVHpFT01Bd0dBMVVFQ0F3RlMwOVNSVUV4RGpBTUJnTlZCQWNNQlZORlQxVk1NUTh3RFFZRFZRUUtEQVpEVlVKUwpTVVF4RHpBTkJnTlZCQXNNQm1OMVluSnBaREVZTUJZR0ExVUVBd3dQUTFWQ1VrbEVJRTl3WlhKaGRHOXlNSUdmCk1BMEdDU3FHU0liM0RRRUJBUVVBQTRHTkFEQ0JpUUtCZ1FETHUxMVdhL3pJV2Niall6RmtzcUhpTjhIM21aaS8KT0R2TjFBM3VDdHFVTkxMMXRxSlczejlpU050TU5FTDNkUThMdXZlTnhvRjJxeEw3MUZOQjBRMkxpREc1aWV2Vwp3djlibVNPcEdSWk5seER3L0hZWmw1YWVmV3h0TDFsdW5JaWRSMjF4L0tMRmYrNkF6eFJBSU9QcksxRzB4c0orCkVicHJvL0s3THlPYWp3SURBUUFCbzFBd1RqQWRCZ05WSFE0RUZnUVVQTHhkTnI4Q2J6UzVOd1BPZjZOYi92QVIKKzdVd0h3WURWUjBqQkJnd0ZvQVVQTHhkTnI4Q2J6UzVOd1BPZjZOYi92QVIrN1V3REFZRFZSMFRCQVV3QXdFQgovekFOQmdrcWhraUc5dzBCQVFzRkFBT0JnUUNnekp4TDFGSjNpQ3JQYkJHVWhxWEdwVng3TDUxZVBHR3JjdGdoClFVUkNnWU1rVEpLellLWTVBM2lYYUNNQzJaSzdFc1VBMjM0U0d0L1JVbnNabThhQVRaS3JxWFVGckVvU1dzMVQKaFNTV2pvbzZUVlVUOEt3YkkwTFdYcVpPL2FXd0NmZVNtNVlaWlhMVU9WUWpZaVgwSmhCVEQwU0V2REhYK1ZVVgp1ckJGRUE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+  mutating:
+    name: cubrid-mutating-webhook
+    namespaceSelector: {}
+    objectSelector: {}
+  validating:
+    name: cubrid-validating-webhook
+    namespaceSelector: {}
+    objectSelector: {}
+  brules:
+  - apiGroups:
+      - k8s.cubrid.com
+    apiVersions:
+      - v1
+    operations:
+      - CREATE
+      - UPDATE
+    resources:
+      - backupdbs
+  crules:
+  - apiGroups:
+      - k8s.cubrid.com
+    apiVersions:
+      - v1
+    operations:
+      - CREATE
+      - UPDATE
+    resources:
+      - cubriddbs
+  secret:
+    tls:
+      crt: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNrakNDQWZ1Z0F3SUJBZ0lKQUxWWGZoVEdhbEwvTUEwR0NTcUdTSWIzRFFFQkN3VUFNR2t4Q3pBSkJnTlYKQkFZVEFrdFBNUTR3REFZRFZRUUlEQVZMVDFKRlFURU9NQXdHQTFVRUJ3d0ZVMFZQVlV3eER6QU5CZ05WQkFvTQpCa05WUWxKSlJERVBNQTBHQTFVRUN3d0dZM1ZpY21sa01SZ3dGZ1lEVlFRRERBOURWVUpTU1VRZ1QzQmxjbUYwCmIzSXdIaGNOTWpReE1URXlNVEkxTVRNMFdoY05NelF4TVRFd01USTFNVE0wV2pCN01Rc3dDUVlEVlFRR0V3SkwKVWpFT01Bd0dBMVVFQ0F3RlUyVnZkV3d4RGpBTUJnTlZCQWNNQlZObGIzVnNNUTh3RFFZRFZRUUtEQVpEVlVKUwpTVVF4RHpBTkJnTlZCQXNNQm1OMVluSnBaREVxTUNnR0ExVUVBd3doWTNWaWNtbGtMWGRsWW1odmIyc3RjMlZ5CmRtbGpaUzVqZFdKeWFXUXVjM1pqTUlHZk1BMEdDU3FHU0liM0RRRUJBUVVBQTRHTkFEQ0JpUUtCZ1FDb0FRVmEKTUl3WHZYYzZLejBQb0piM2dpZ05oUERacWdGR29tK3dqcjE0bk9IbTlaMklGcm94cm1qS0JLOUFHWkRrUlUrbApSaFlVNE9kemtTd1dsTG40d3dMNWNZTmdaaUhIaE1DV2FPcnZ3clNNUHdpb1ZlREcxTTVXdkNPeXdFOTREdVVyCkdIaU83S2plSzV2dEhZN2Q0NTVROUZTcklSTldJWll5N1FUU2x3SURBUUFCb3pBd0xqQXNCZ05WSFJFRUpUQWoKZ2lGamRXSnlhV1F0ZDJWaWFHOXZheTF6WlhKMmFXTmxMbU4xWW5KcFpDNXpkbU13RFFZSktvWklodmNOQVFFTApCUUFEZ1lFQW51ZS8vQTFzYk85SWRhc1ZrQmY4UENWQm0xY3p4OFRqYVZwUHR3Sk4yY3ViMW83K1pnUVdtUnhGCjk2a2FhZnRjRCtLeDNna1l3bVUrVG9aakwwSUJjczBBQUc0NklLbmRtWm5KZmRIN0RZeVNCS0p4VDhjazlZR2YKM3VvRkdyMmVJaXRsTjRWQW83MFQ4T3JnVE52NG4yQUJjdUQ4Y1RQNUw0OHZFbG1OMVZ3PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+      key: "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUNlUUlCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQW1Nd2dnSmZBZ0VBQW9HQkFLZ0JCVm93akJlOWR6b3IKUFErZ2x2ZUNLQTJFOE5tcUFVYWliN0NPdlhpYzRlYjFuWWdXdWpHdWFNb0VyMEFaa09SRlQ2VkdGaFRnNTNPUgpMQmFVdWZqREF2bHhnMkJtSWNlRXdKWm82dS9DdEl3L0NLaFY0TWJVemxhOEk3TEFUM2dPNVNzWWVJN3NxTjRyCm0rMGRqdDNqbmxEMFZLc2hFMVlobGpMdEJOS1hBZ01CQUFFQ2dZRUFsN3NjVDJFckZVSExqV0NCckR4NFBCOXoKOXduSzBIcW0zbGxVRUJ4S2FNVWZqUXprOG9TOE1xUjNCWVVIbGhmQThUamIvc04ycS9LWGRwdDFPd3Vsak50ZwpMRUFpeDRsSDZjN01UQVBWTUlkSENuV3ZKUkhmQjRadkE1T2VNRUEvMHJkNU10TmY0Z3BtMVA2T1FRbDljMnpSCnlyOURiL3ZaczBSZkRzQi96aWtDUVFEZW5IQ01ZYURkYXlHaFdTR0lyREpZV3AxbGFqTWxFc3UrdUY3dXpjR0YKbUNIalFydW9YQWFNZ1lIcEgraWQ3Zmhwam1TYXN2Rk92TVJlTU41ckRmQ1ZBa0VBd1RQWGJ3ZWQveW52RkZFSgpNRGhhdlcwSGt0MnN4dkU5Nm9pazljNlVUNHpMZDNWdFBod2pLR0Nnc0xFaiszV0pqL1dhTmh6dEVycExHVmtCCjNYT1Bld0pCQUl0eUdicUdTWHVKNldZbDdEQ3VGVmR0WTkwc1dsOWwxOFZmdnUvK2FiUmk2UTl3TlJjd2xsV2IKcHFJKy83czJYMzdYMk1OalJtK1pKYlVQRGJTbjVjVUNRUUNjQlAxb2tFSXJHUFlVOWd2eGdORG1QL0hwekZJRwpwakpWLzlzWEZhZjNSYi9aekY1WDFla2Vaa25kNW04a1ZocXN3cTJ5SFZIbDJjTmp5TmtVdUltWkFrRUFuNXhqCjFOL3FJTjNGM3pLYnpVWFNXUG82WlE2S3VmQUdQVEVIaWM3QzlNVlkrQ1RZZHg1YVQ5aER3aGk2Z0NYU1VBY00KUWdxYTJiT2tVRnZJN3h3ZG1RPT0KLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo="
+      
+  # -- Annotations to add to webhook Pod
+  podAnnotations: {}
+
+  serviceAccount:
+    name: ""
+
+  clusterRoleName:
+    name: ""
+
+  clusterRoleBindingName:
+    name: ""    
+
+  secretName:
+    name: ""
+  
+  serviceName:
+    name: ""

@@ -1,0 +1,31 @@
+apiVersion: k8s.cubrid.com/v1
+kind: CubridDB
+metadata:
+  name: cubrid-master
+
+spec:
+  image: airnet73/cubrid:v11.3.1.3
+  updateStrategy:
+    type: "RollingUpdate" 
+    rollingUpdate:
+      partition: 0        
+      maxUnavailable: 3
+  replication:
+    enable: true
+    replicas: 2
+    hamodeType:
+      type: "master-slave"
+ 
+  broker:
+  - name: ms-broker1-svc
+    port: 30000
+    servicePort: 30000
+    serviceType: NodePort
+  - name: ms-broker2-svc
+    port: 33000
+    servicePort: 30300
+    serviceType: NodePort
+  - name: ms-broker3-svc
+    port: 33300
+    servicePort: 30330
+    serviceType: NodePort

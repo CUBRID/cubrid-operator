@@ -1,0 +1,356 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: cubriddbs.k8s.cubrid.com
+spec:
+  group: k8s.cubrid.com
+  names:
+    kind: CubridDB
+    listKind: CubridDBList
+    plural: cubriddbs
+    singular: cubriddb
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.hamode
+      name: HA Mode
+      type: string
+    - jsonPath: .status.currentMaster
+      name: Master Server
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: CubridDB is the Schema for the cubriddbs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CubridDBSpec defines the desired state of CubridDB
+            properties:
+              affinty:
+                properties:
+                  enableAntiAffinity:
+                    type: boolean
+                type: object
+              broker:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    port:
+                      format: int32
+                      type: integer
+                    servicePort:
+                      format: int32
+                      type: integer
+                    serviceType:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              image:
+                type: string
+              label:
+                type: string
+              replication:
+                properties:
+                  enable:
+                    type: boolean
+                  hamodeType:
+                    properties:
+                      cubridRef:
+                        properties:
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                          replicaLink:
+                            type: string
+                        type: object
+                      type:
+                        type: string
+                    type: object
+                  replicas:
+                    format: int32
+                    type: integer
+                type: object
+              storage:
+                items:
+                  properties:
+                    mountPath:
+                      type: string
+                    name:
+                      type: string
+                    size:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    storageClassName:
+                      type: string
+                    type:
+                      type: string
+                    volumeName:
+                      type: string
+                  type: object
+                type: array
+              updateStrategy:
+                description: |-
+                  StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
+                  controller will use to perform updates. It includes any additional parameters
+                  necessary to perform the update for the indicated strategy.
+                properties:
+                  rollingUpdate:
+                    description: RollingUpdate is used to communicate parameters when
+                      Type is RollingUpdateStatefulSetStrategyType.
+                    properties:
+                      maxUnavailable:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          The maximum number of pods that can be unavailable during the update.
+                          Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                          Absolute number is calculated from percentage by rounding up. This can not be 0.
+                          Defaults to 1. This field is alpha-level and is only honored by servers that enable the
+                          MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
+                          Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
+                          will be counted towards MaxUnavailable.
+                        x-kubernetes-int-or-string: true
+                      partition:
+                        description: |-
+                          Partition indicates the ordinal at which the StatefulSet should be partitioned
+                          for updates. During a rolling update, all pods from ordinal Replicas-1 to
+                          Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
+                          This is helpful in being able to do a canary based deployment. The default value is 0.
+                        format: int32
+                        type: integer
+                    type: object
+                  type:
+                    description: |-
+                      Type indicates the type of the StatefulSetUpdateStrategy.
+                      Default is RollingUpdate.
+                    type: string
+                type: object
+            type: object
+          status:
+            description: CubridDBStatus defines the observed state of CubridDB
+            properties:
+              conditions:
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              currentMaster:
+                type: string
+              hamode:
+                type: string
+              lastUpdated:
+                format: date-time
+                type: string
+              nodeLists:
+                additionalProperties:
+                  type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: backupdbs.k8s.cubrid.com
+spec:
+  group: k8s.cubrid.com
+  names:
+    kind: BackupDB
+    listKind: BackupDBList
+    plural: backupdbs
+    singular: backupdb
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Command of the BackupDB
+      jsonPath: .status.command
+      name: Command
+      type: string
+    - description: File path for the backup script
+      jsonPath: .status.filePath
+      name: File Path
+      type: string
+    - description: Status of the command execution
+      jsonPath: .status.commandStatus
+      name: Command Status
+      type: string
+    - description: Time duration since creation of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: BackupDB is the Schema for the backupdbs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupDBSpec defines the desired state of BackupDB
+            properties:
+              commandArgs:
+                properties:
+                  args:
+                    items:
+                      type: string
+                    type: array
+                  filepath:
+                    type: string
+                type: object
+              cubridDBRef:
+                description: |-
+                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                properties:
+                  dbName:
+                    type: string
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
+              storageRef:
+                properties:
+                  storageType:
+                    type: string
+                type: object
+            type: object
+          status:
+            description: BackupDBStatus defines the observed state of BackupDB
+            properties:
+              command:
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                type: string
+              commandStatus:
+                type: string
+              filePath:
+                type: string
+              message:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,59 @@
+{{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name:  {{ include "cubrid-operator-webhook.clusterRoleName" . }}
+rules:
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs/status
+  verbs:
+  - get
+  - patch
+  - update
+{{- end }}

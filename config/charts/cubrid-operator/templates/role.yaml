@@ -1,0 +1,130 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cubrid-operator.clusterRoleName" . }}
+rules:
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  - pods/exec
+  - pods/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+  - exec
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - secrets
+  - serviceaccounts
+  - services
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - endpoints/restricted
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch  
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - endpoints/restricted
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch

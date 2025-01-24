@@ -1,0 +1,38 @@
+{{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
+{{ $fullName := include "cubrid-operator.fullname" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullName }}-webhook-dep
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $fullName }}-webhook-dep
+  template:
+    metadata:
+      {{- with .Values.webhook.podAnnotationss }}
+      annotations:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: {{ $fullName }}-webhook-dep
+        control-plane: controller-manager  
+    spec:
+      serviceAccountName: {{ include "cubrid-operator-webhook.serviceAccountName" . }}
+      containers:
+      - name: {{ $fullName }}-webhook-dep
+        image: airnet73/operator:latest
+        args: ["webhook"]  
+        ports:
+        - containerPort: 4443
+          name: webhook
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: {{ include "cubrid-operator-webhook.secretName" . }}
+{{- end }}

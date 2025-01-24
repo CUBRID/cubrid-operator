@@ -1,0 +1,23 @@
+apiVersion: k8s.cubrid.com/v1
+kind: BackupDB
+metadata:
+  labels:
+    app.kubernetes.io/name: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: backupdb-test1
+spec:
+  storageA:
+    testStr: "/home/cubrid/CUBRID/share/scripts/backupdb.sh"
+  cubridDBRef:
+    name: cubrid-test2-0
+    namespace: default
+    dbName: cubdb
+  commandArgs:
+    filepath: "/home/cubrid/CUBRID/share/scripts/backupdb.sh"
+    args:
+      - "start"
+      - "demodb"
+      - "0"
+      - "5"
+  storageRef:
+    storageType: backup-storage-type

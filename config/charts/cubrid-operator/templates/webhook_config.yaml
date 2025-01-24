@@ -1,0 +1,134 @@
+{{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
+{{ $fullName := include "cubrid-operator.fullname" . }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ $fullName }}-webhook-mutating
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "cubrid-operator-webhook.serviceName" . }}
+      namespace: {{ .Values.namespace | default .Release.Namespace }}
+      path: /mutate-k8s-cubrid-com-v1-backupdb
+    caBundle: {{ .Values.webhook.cabundle }}
+  failurePolicy: Fail
+  name: mbackupdb.kb.io
+  rules:
+  {{- range .Values.webhook.brules }}
+  - apiGroups:
+      {{- range .apiGroups }}
+      - {{ . | quote }}
+      {{- end }}
+    apiVersions:
+      {{- range .apiVersions }}
+      - {{ . | quote }}
+      {{- end }}
+    operations:
+      {{- range .operations }}
+      - {{ . | quote }}
+      {{- end }}
+    resources:
+      {{- range .resources }}
+      - {{ . | quote }}
+      {{- end }}
+{{- end }}
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "cubrid-operator-webhook.serviceName" . }}
+      namespace: {{ .Values.namespace | default .Release.Namespace }}
+      path: /mutate-k8s-cubrid-com-v1-cubriddb
+    caBundle: {{ .Values.webhook.cabundle }}
+  failurePolicy: Fail
+  name: mcubriddb.kb.io
+  rules:
+  {{- range .Values.webhook.crules }}
+  - apiGroups:
+      {{- range .apiGroups }}
+      - {{ . | quote }}
+      {{- end }}
+    apiVersions:
+      {{- range .apiVersions }}
+      - {{ . | quote }}
+      {{- end }}
+    operations:
+      {{- range .operations }}
+      - {{ . | quote }}
+      {{- end }}
+    resources:
+      {{- range .resources }}
+      - {{ . | quote }}
+      {{- end }}
+{{- end }}
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ $fullName }}-validating-webhook
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "cubrid-operator-webhook.serviceName" . }}
+      namespace: {{ .Values.namespace | default .Release.Namespace }}
+      path: /validate-k8s-cubrid-com-v1-backupdb
+    caBundle: {{ .Values.webhook.cabundle }}
+  failurePolicy: Fail
+  name: vbackupdb.kb.io
+  rules:
+  {{- range .Values.webhook.brules }}
+  - apiGroups:
+      {{- range .apiGroups }}
+      - {{ . | quote }}
+      {{- end }}
+    apiVersions:
+      {{- range .apiVersions }}
+      - {{ . | quote }}
+      {{- end }}
+    operations:
+      {{- range .operations }}
+      - {{ . | quote }}
+      {{- end }}
+    resources:
+      {{- range .resources }}
+      - {{ . | quote }}
+      {{- end }}
+  {{- end }}
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "cubrid-operator-webhook.serviceName" . }}
+      namespace: {{ .Values.namespace | default .Release.Namespace }}
+      path: /validate-k8s-cubrid-com-v1-cubriddb
+    caBundle: {{ .Values.webhook.cabundle }}
+  failurePolicy: Fail
+  name: vcubriddb.kb.io
+  rules:
+  {{- range .Values.webhook.crules }}
+  - apiGroups:
+      {{- range .apiGroups }}
+      - {{ . | quote }}
+      {{- end }}
+    apiVersions:
+      {{- range .apiVersions }}
+      - {{ . | quote }}
+      {{- end }}
+    operations:
+      {{- range .operations }}
+      - {{ . | quote }}
+      {{- end }}
+    resources:
+      {{- range .resources }}
+      - {{ . | quote }}
+      {{- end }}
+  {{- end }}
+  sideEffects: None
+{{- end }}

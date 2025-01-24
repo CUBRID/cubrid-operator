@@ -1,0 +1,31 @@
+# permissions for end users to edit cubriddbs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: cubriddb-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: cubrid-operator
+    app.kubernetes.io/part-of: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: {{ include "cubrid-operator.cubriddbEditClusterRoleName" . }}
+rules:
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - cubriddbs/status
+  verbs:
+  - get

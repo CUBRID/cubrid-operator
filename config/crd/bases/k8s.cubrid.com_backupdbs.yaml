@@ -1,0 +1,105 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: backupdbs.k8s.cubrid.com
+spec:
+  group: k8s.cubrid.com
+  names:
+    kind: BackupDB
+    listKind: BackupDBList
+    plural: backupdbs
+    singular: backupdb
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Command of the BackupDB
+      jsonPath: .status.command
+      name: Command
+      type: string
+    - description: File path for the backup script
+      jsonPath: .status.filePath
+      name: File Path
+      type: string
+    - description: Status of the command execution
+      jsonPath: .status.commandStatus
+      name: Command Status
+      type: string
+    - description: Time duration since creation of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: BackupDB is the Schema for the backupdbs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupDBSpec defines the desired state of BackupDB
+            properties:
+              commandArgs:
+                properties:
+                  args:
+                    items:
+                      type: string
+                    type: array
+                  filepath:
+                    type: string
+                type: object
+              cubridDBRef:
+                description: |-
+                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                properties:
+                  dbName:
+                    type: string
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
+              storageRef:
+                properties:
+                  storageType:
+                    type: string
+                type: object
+            type: object
+          status:
+            description: BackupDBStatus defines the observed state of BackupDB
+            properties:
+              command:
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                type: string
+              commandStatus:
+                type: string
+              filePath:
+                type: string
+              message:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

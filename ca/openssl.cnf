@@ -1,0 +1,17 @@
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+C = KR
+ST = Seoul
+L = Seoul
+O = CUBRID
+OU = cubrid
+CN = cubrid-webhook-service.cubrid.svc
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = cubrid-webhook-service.cubrid.svc

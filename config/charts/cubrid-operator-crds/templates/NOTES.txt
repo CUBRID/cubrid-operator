@@ -1,0 +1,5 @@
+cubrid-operator CRDs have been successfully installed!
+
+To complete the cubird-operator installation, please now proceed to install the
+cubrid-operator chart:
+https://github.com/cubrid/cubrid-operator

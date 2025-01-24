@@ -1,0 +1,31 @@
+# permissions for end users to edit backupdbs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: backupdb-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: cubrid-operator
+    app.kubernetes.io/part-of: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: backupdb-editor-role
+rules:
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs/status
+  verbs:
+  - get
