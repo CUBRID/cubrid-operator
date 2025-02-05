@@ -25,6 +25,7 @@ const (
 
 	DefaultStorageClassName = "longhorn" // standard로 변경이 필요함
 
+	// initcontainer
 	InitCopyConfContainerName     = "init-copy-conf"
 	InitRecoveryConfContainerName = "init-recovery-conf"
 	InitCopyConfCommand           = "cp -rn /home/cubrid/CUBRID/conf/* /mnt/conf"
@@ -33,9 +34,9 @@ const (
 		"chown -R 1000:1000 /home/cubrid/CUBRID/databases && " +
 		"chown -R 1000:1000 /home/cubrid/CUBRID/backupdb && " +
 		"chown -R 1000:1000 /home/cubrid/CUBRID/log"
-
 	BusyBoxImage = "busybox"
 
+	// user
 	CubridUser  = int64(1000)
 	CubridGroup = int64(1000)
 	RootUser    = int64(0)

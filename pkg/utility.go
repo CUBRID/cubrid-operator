@@ -41,7 +41,7 @@ func GetStatefulSetFromPod(k8sClient client.Client, pod *corev1.Pod) (*appsv1.St
 
 // GetCubridDBFromStatefulSet retrieves the CubridDB object associated with the given StatefulSet.
 func GetCubridDBFromStatefulSet(k8sClient client.Client, statefulSet *appsv1.StatefulSet) (*cubridv1.CubridDB, error) {
-	name, ok := statefulSet.Labels["app"] // 적절한 레이블 키를 사용하세요.
+	name, ok := statefulSet.Labels["app"]
 	if !ok {
 		return nil, fmt.Errorf("CubridDB name label not found in StatefulSet %s", statefulSet.Name)
 	}
@@ -59,7 +59,6 @@ func GetCubridDBFromStatefulSet(k8sClient client.Client, statefulSet *appsv1.Sta
 	return cubridDB, nil
 }
 
-// GetCubridDBFromPod는 Pod 객체를 사용하여 CubridDB 객체를 반환하는 함수입니다.
 func GetCubridDBFromPod(c client.Client, pod *corev1.Pod) (*cubridv1.CubridDB, error) {
 	statefulSet, err := GetStatefulSetFromPod(c, pod)
 	if err != nil {
@@ -75,7 +74,6 @@ func GetCubridDBFromPod(c client.Client, pod *corev1.Pod) (*cubridv1.CubridDB, e
 }
 
 func GetStatefulSetFromCubridDB(k8sClient client.Client, cubridDB *cubridv1.CubridDB) (*appsv1.StatefulSet, error) {
-	// StatefulSet을 가져옴
 	statefulSet := &appsv1.StatefulSet{}
 	if err := k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: cubridDB.Namespace,
@@ -87,10 +85,8 @@ func GetStatefulSetFromCubridDB(k8sClient client.Client, cubridDB *cubridv1.Cubr
 	return statefulSet, nil
 }
 
-// GetCubridDBByName은 주어진 네임스페이스와 이름으로 CubridDB 객체를 반환하는 함수입니다.
 func GetCubridDBByName(c client.Client, namespace, name string) (*cubridv1.CubridDB, error) {
 	cubridDB := &cubridv1.CubridDB{}
-	// 네임스페이스와 이름을 사용하여 CubridDB 객체를 조회
 	if err := c.Get(context.Background(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
@@ -100,10 +96,7 @@ func GetCubridDBByName(c client.Client, namespace, name string) (*cubridv1.Cubri
 	return cubridDB, nil
 }
 
-// UpdateReplicaLink는 주어진 네임스페이스와 이름의 CubridDB 객체의 Spec를 수정한 후 적용하는 함수입니다.
 func UpdateReplicaLink(c client.Client, cubridDB *cubridv1.CubridDB, name string, updatType int) error {
-
-	// Spec의 일부를 수정하는 함수 호출
 	if updatType == settings.ADD_REPLICALINK {
 		AddReplicaLink(cubridDB, name)
 	} else if updatType == settings.DELETE_REPLICALINK {
@@ -112,7 +105,6 @@ func UpdateReplicaLink(c client.Client, cubridDB *cubridv1.CubridDB, name string
 		return nil
 	}
 
-	// 변경된 객체를 클러스터에 적용
 	if err := c.Update(context.Background(), cubridDB); err != nil {
 		return err
 	}
@@ -124,31 +116,27 @@ func UpdateReplicaLink(c client.Client, cubridDB *cubridv1.CubridDB, name string
 func AddReplicaLink(c *cubridv1.CubridDB, name string) {
 	log.Log.Info("AddReplicaLink", "name", name)
 
-	// HAmodeType이 nil인지 확인
 	if c.Spec.Replication == nil {
-		c.Spec.Replication = &cubridv1.Replication{} // Replication을 초기화
+		c.Spec.Replication = &cubridv1.Replication{}
 	}
 
 	if c.Spec.Replication.HAmodeType == nil {
-		c.Spec.Replication.HAmodeType = &cubridv1.HAmodeType{} // HAmodeType을 초기화
+		c.Spec.Replication.HAmodeType = &cubridv1.HAmodeType{}
 	}
 
 	if c.Spec.Replication.HAmodeType.CubridRef == nil {
-		c.Spec.Replication.HAmodeType.CubridRef = &cubridv1.CubridRef{} // CubridRef를 초기화
+		c.Spec.Replication.HAmodeType.CubridRef = &cubridv1.CubridRef{}
 	}
 
-	// 원본 ReplicaLink 필드를 참조
 	replicaLink := &c.Spec.Replication.HAmodeType.CubridRef.ReplicaLink
 	links := strings.Split(*replicaLink, ":")
 
-	// 이미 존재하는 경우 추가하지 않음
 	for _, link := range links {
 		if link == name {
 			return
 		}
 	}
 
-	// 값 추가
 	if *replicaLink == "" {
 		*replicaLink = name
 	} else {
@@ -164,19 +152,16 @@ func RemoveReplicaLink(c *cubridv1.CubridDB, name string) {
 		return
 	}
 
-	// 원본 ReplicaLink 필드를 참조
 	replicaLink := &c.Spec.Replication.HAmodeType.CubridRef.ReplicaLink
 	links := strings.Split(*replicaLink, ":")
 	var newLinks []string
 
-	// 해당 replica를 제외한 나머지 값만 저장
 	for _, link := range links {
 		if link != name {
 			newLinks = append(newLinks, link)
 		}
 	}
 
-	// 수정된 값으로 원본 필드 업데이트
 	*replicaLink = strings.Join(newLinks, ":")
 }
 
@@ -223,7 +208,6 @@ func GetCubridDBPodList(
 }
 
 func UpdateCubridDB(ctx context.Context, c client.Client, pod *corev1.Pod) error {
-	// 1. Pod의 OwnerReferences에서 StatefulSet을 찾기
 	var statefulSetName string
 	for _, ownerRef := range pod.OwnerReferences {
 		if ownerRef.Kind == "StatefulSet" {
@@ -237,13 +221,11 @@ func UpdateCubridDB(ctx context.Context, c client.Client, pod *corev1.Pod) error
 		return fmt.Errorf("no StatefulSet owner found for Pod %s", pod.Name)
 	}
 
-	// 2. StatefulSet 가져오기
 	var statefulSet appsv1.StatefulSet
 	if err := c.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: statefulSetName}, &statefulSet); err != nil {
 		return fmt.Errorf("failed to get StatefulSet %s: %v", statefulSetName, err)
 	}
 
-	// 3. StatefulSet의 OwnerReferences에서 CubridDB 찾기
 	var cubridDBName string
 	for _, ownerRef := range statefulSet.OwnerReferences {
 		if ownerRef.Kind == "CubridDB" {
@@ -256,7 +238,6 @@ func UpdateCubridDB(ctx context.Context, c client.Client, pod *corev1.Pod) error
 		return fmt.Errorf("no CubridDB owner found for StatefulSet %s", statefulSetName)
 	}
 
-	// 4. CubridDB 가져오기
 	var cubridDB cubridv1.CubridDB
 	if err := c.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: cubridDBName}, &cubridDB); err != nil {
 		return fmt.Errorf("failed to get CubridDB %s: %v", cubridDBName, err)
