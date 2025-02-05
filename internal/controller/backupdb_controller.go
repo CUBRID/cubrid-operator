@@ -156,7 +156,7 @@ func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *k8sv1.Ba
 		return fmt.Errorf("not all containers are in Running state, requeueing %s: %v", podName, err)
 	}
 
-	if err := r.execCommandInPod(r.Config, namespace, podName, pod.Spec.Containers[0].Name, getCommand(backupDB)); err != nil {
+	if err := r.execCommandInPod(r.Config, namespace, podName, pod.Spec.Containers[0].Name, getBackupDBCommand(backupDB)); err != nil {
 		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, fmt.Sprintf("Command failed: %v", err))
 		return fmt.Errorf("command failed: %v", err)
 	}
@@ -289,20 +289,13 @@ func (r *BackupDBReconciler) updateCommandStatus(ctx context.Context, backupdb *
 	}
 }
 
-func getCommand(backupDB *k8sv1.BackupDB) []string {
-	if backupDB.Spec.CommandArgs == nil {
-		backupDB.Spec.CommandArgs = backupDB.CommandArgs()
-	}
+func getBackupDBCommand(backupDB *k8sv1.BackupDB) []string {
+	filePath := getCommandFile(backupDB)
+	args := getCommandArgs(backupDB)
 
-	filePath := backupDB.Spec.CommandArgs.FilePath
-	args := backupDB.Spec.CommandArgs.Args
-	if args == nil {
-		args = []string{}
-	}
+	commandStr := fmt.Sprintf("$CUBRID/%s %s", filePath, args)
 
-	commandStr := fmt.Sprintf("$CUBRID/%s %s", filePath, strings.Join(args, " "))
-
-	return []string{"/bin/bash", "-c", commandStr}
+	return []string{"sh", "-c", commandStr}
 }
 
 func getCommandArgs(backupDB *k8sv1.BackupDB) string {
