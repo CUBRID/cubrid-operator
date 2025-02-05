@@ -73,8 +73,8 @@ const (
 
 	// Cubrid Manager
 	CMS_HTTPS_URL = "https://%s:%d/cm_api"
-	CMS_ID        = "testcm"  // 반영할때는 cms_cr
-	CMS_PW        = "testpwd" // 반영할때는 cms_pwd
+	CMS_ID        = "testcm"
+	CMS_PW        = "testpwd"
 	CMS_PORT      = 8001
 	CMS_VERSION   = "11.4"
 

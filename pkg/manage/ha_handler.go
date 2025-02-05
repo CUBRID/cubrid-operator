@@ -214,7 +214,7 @@ func (r *HAHandler) updateHAReplicaList(
 	namespace string,
 	req ctrl.Request,
 ) error {
-	var command []string = []string{}
+	var command []string
 	var repDNSListStr []string
 	var repNodeListStr string = ""
 	var rList *v1.PodList = &v1.PodList{}
