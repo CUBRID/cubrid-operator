@@ -300,8 +300,9 @@ func getCommand(backupDB *k8sv1.BackupDB) []string {
 		args = []string{}
 	}
 
-	command := append([]string{filePath}, args...)
-	return command
+	commandStr := fmt.Sprintf("$CUBRID/%s %s", filePath, strings.Join(args, " "))
+
+	return []string{"/bin/bash", "-c", commandStr}
 }
 
 func getCommandArgs(backupDB *k8sv1.BackupDB) string {

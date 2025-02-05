@@ -11,7 +11,7 @@ spec:
     namespace: default
     dbName: demodb
   commandArgs:
-    filepath: "/home/cubrid/CUBRID/share/scripts/backupdb.sh"
+    filepath: "/share/scripts/backupdb.sh"
     args:
       - "start"
       - "demodb"

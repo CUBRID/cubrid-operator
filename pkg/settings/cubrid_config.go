@@ -22,6 +22,10 @@ const (
 	LogsBackupMountPath  = "/mnt/log"
 	DBBackupVolumeName   = "databases-backup"
 	DBBackupMountPath    = "/mnt/databases"
+	Default_Volume_Size  = "2Gi"
+	Volume_Size_10Gi     = "10Gi"
+	Volume_Size_50Gi     = "50Gi"
+	Volume_Size_100Gi    = "100Gi"
 
 	DefaultStorageClassName = "longhorn" // standard로 변경이 필요함
 
