@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	k8sv1 "github.com/cubrid/cubrid-operator/api/v1"
+	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 )
 
 var _ = Describe("BackupDB Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("BackupDB Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		backupdb := &k8sv1.BackupDB{}
+		backupdb := &cubridv1.BackupDB{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind BackupDB")
 			err := k8sClient.Get(ctx, typeNamespacedName, backupdb)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &k8sv1.BackupDB{
+				resource := &cubridv1.BackupDB{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("BackupDB Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &k8sv1.BackupDB{}
+			resource := &cubridv1.BackupDB{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

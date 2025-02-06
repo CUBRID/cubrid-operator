@@ -3,14 +3,14 @@ package pkg
 import (
 	"strconv"
 
-	v1 "github.com/cubrid/cubrid-operator/api/v1"
+	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 func CreateStatefulSet(
-	cubridDB *v1.CubridDB,
+	cubridDB *cubridv1.CubridDB,
 	initContainers []corev1.Container,
 	containers []corev1.Container,
 	serviceName string,

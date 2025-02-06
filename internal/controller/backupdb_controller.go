@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	k8sv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
 	"github.com/cubrid/cubrid-operator/pkg/settings"
 )
@@ -66,7 +64,7 @@ func (r *BackupDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log := log.FromContext(ctx)
 	log.Info("======= BackupDBReconciler: Start ========")
 
-	var backupDB k8sv1.BackupDB
+	var backupDB cubridv1.BackupDB
 	if err := r.Get(ctx, req.NamespacedName, &backupDB); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -107,16 +105,16 @@ func (r *BackupDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupDBReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&k8sv1.BackupDB{}).
+		For(&cubridv1.BackupDB{}).
 		Complete(r)
 }
 
-func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *k8sv1.BackupDB) error {
+func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *cubridv1.BackupDB) error {
 	podName := backupDB.Spec.CubridDBRef.Name
 	namespace := backupDB.Spec.CubridDBRef.Namespace
 	storageType := backupDB.Spec.StorageRef.StorageType
 
-	var pod v1.Pod
+	var pod corev1.Pod
 	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: podName}, &pod); err != nil {
 		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, "Pod not found or inaccessible")
 		return fmt.Errorf("failed to get pod %s: %v", podName, err)
@@ -154,7 +152,7 @@ func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *k8sv1.Ba
 
 func (r *BackupDBReconciler) getMountPathFromCubriddb(
 	ctx context.Context,
-	backupdb *k8sv1.BackupDB,
+	backupdb *cubridv1.BackupDB,
 	podName string,
 	namespace string,
 	storageType string,
@@ -223,7 +221,7 @@ func (r *BackupDBReconciler) execCommandInPod(config *rest.Config, namespace, po
 	return nil
 }
 
-func (r *BackupDBReconciler) addFinalizer(ctx context.Context, backupDB *k8sv1.BackupDB) error {
+func (r *BackupDBReconciler) addFinalizer(ctx context.Context, backupDB *cubridv1.BackupDB) error {
 	if !controllerutil.ContainsFinalizer(backupDB, backupDB.Name) {
 		controllerutil.AddFinalizer(backupDB, backupDB.Name)
 		return r.Update(ctx, backupDB)
@@ -231,10 +229,10 @@ func (r *BackupDBReconciler) addFinalizer(ctx context.Context, backupDB *k8sv1.B
 	return nil
 }
 
-func (r *BackupDBReconciler) updateCommandStatus(ctx context.Context, backupdb *k8sv1.BackupDB, status, message string) {
+func (r *BackupDBReconciler) updateCommandStatus(ctx context.Context, backupdb *cubridv1.BackupDB, status, message string) {
 	log := log.FromContext(ctx)
 
-	updatedBackupDB := &k8sv1.BackupDB{}
+	updatedBackupDB := &cubridv1.BackupDB{}
 	if err := r.Get(ctx, types.NamespacedName{
 		Name:      backupdb.Name,
 		Namespace: backupdb.Namespace,
@@ -257,7 +255,7 @@ func (r *BackupDBReconciler) updateCommandStatus(ctx context.Context, backupdb *
 	}
 }
 
-func getBackupDBCommand(backupDB *k8sv1.BackupDB) []string {
+func getBackupDBCommand(backupDB *cubridv1.BackupDB) []string {
 	filePath := getCommandFile(backupDB)
 	args := getCommandArgs(backupDB)
 
@@ -266,7 +264,7 @@ func getBackupDBCommand(backupDB *k8sv1.BackupDB) []string {
 	return []string{"sh", "-c", commandStr}
 }
 
-func getCommandArgs(backupDB *k8sv1.BackupDB) string {
+func getCommandArgs(backupDB *cubridv1.BackupDB) string {
 	if backupDB.Spec.CommandArgs == nil {
 		backupDB.Spec.CommandArgs = backupDB.CommandArgs()
 	}
@@ -281,7 +279,7 @@ func getCommandArgs(backupDB *k8sv1.BackupDB) string {
 	return argsStr
 }
 
-func getCommandFile(backupDB *k8sv1.BackupDB) string {
+func getCommandFile(backupDB *cubridv1.BackupDB) string {
 	if backupDB.Spec.CommandArgs == nil {
 		backupDB.Spec.CommandArgs = backupDB.CommandArgs()
 	}
@@ -294,7 +292,7 @@ func getCommandFile(backupDB *k8sv1.BackupDB) string {
 	return filePath
 }
 
-func isCommandChanged(backupDB *k8sv1.BackupDB) bool {
+func isCommandChanged(backupDB *cubridv1.BackupDB) bool {
 	status := backupDB.BackupDBStatus()
 	command := backupDB.CommandArgs()
 
