@@ -35,7 +35,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
@@ -146,12 +145,10 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		cronScheduler := cron.New(cron.WithSeconds()) // Cron 인스턴스 생성
 		if err = (&controller.BackupDBReconciler{
 			Client: mgr.GetClient(),
 			Scheme: mgr.GetScheme(),
 			Config: mgr.GetConfig(),
-			Cron:   cronScheduler,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "BackupDB")
 			os.Exit(1)

@@ -21,9 +21,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 
-	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,10 +45,8 @@ import (
 // BackupDBReconciler reconciles a BackupDB object
 type BackupDBReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	Config          *rest.Config
-	Cron            *cron.Cron
-	runningCommands sync.Map
+	Scheme *runtime.Scheme
+	Config *rest.Config
 }
 
 //+kubebuilder:rbac:groups=k8s.cubrid.com,resources=backupdbs,verbs=get;list;watch;create;update;patch;delete
@@ -152,7 +148,6 @@ func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *k8sv1.Ba
 		return fmt.Errorf("command failed: %v", err)
 	}
 
-	r.runningCommands.Delete(podName)
 	r.updateCommandStatus(ctx, backupDB, settings.BackupDB_COMPLETED, "Command sent successfully")
 	return nil
 }

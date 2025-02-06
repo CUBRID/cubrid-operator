@@ -55,7 +55,7 @@ type BackupDBStatus struct {
 	Command       string `json:"command,omitempty"`
 	FilePath      string `json:"filePath,omitempty"`
 	CommandStatus string `json:"commandStatus,omitempty"`
-	Message       string `json:"message,omitempty"` // 상태에 대한 추가 설명
+	Message       string `json:"message,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -229,7 +229,7 @@ func (c *CubridDB) InitImage() {
 
 func (c *CubridDB) InitStorages() {
 	if len(c.Spec.Storage) == 0 {
-		size := resource.MustParse("2Gi")
+		size := resource.MustParse(settings.Default_Volume_Size)
 		db_storage := Storage{
 			Name:             "database-storage",
 			Type:             settings.StorageType_Database,
