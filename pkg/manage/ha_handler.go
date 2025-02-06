@@ -216,7 +216,7 @@ func (r *HAHandler) updateHAReplicaList(
 	var command []string
 	var repDNSListStr []string
 	var repNodeListStr string = ""
-	var rList *v1.PodList = &v1.PodList{}
+	var rList *corev1.PodList = &corev1.PodList{}
 
 	if replicaCubridDBName != "" {
 		var rServiceName string
@@ -282,7 +282,7 @@ func (r *HAHandler) settingHAReplica(
 	return nil
 }
 
-func CreateDNSList(pods []v1.Pod, serviceName, namespace string) []string {
+func CreateDNSList(pods []corev1.Pod, serviceName, namespace string) []string {
 	dnsList := make([]string, 0, len(pods))
 
 	for _, pod := range pods {
@@ -439,7 +439,7 @@ func deleteReplicaCommand() []string {
 
 func (r *HAHandler) execCommandsInPods(
 	ctx context.Context,
-	pods []v1.Pod,
+	pods []corev1.Pod,
 	config *rest.Config,
 	namespace string,
 	command []string,
@@ -549,7 +549,7 @@ func (r *HAHandler) getCubridDBPodList(
 	ctx context.Context,
 	name string,
 	namespace string,
-) (*v1.PodList, string, error) {
+) (*corev1.PodList, string, error) {
 	var statefulSet appsv1.StatefulSet
 	var serviceName string
 
