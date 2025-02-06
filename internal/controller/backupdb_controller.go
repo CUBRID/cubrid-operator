@@ -53,13 +53,6 @@ type BackupDBReconciler struct {
 	runningCommands sync.Map
 }
 
-// backupdb 리소스별로 cron 객체를 관리하는 맵
-var (
-	cronSchedulers = make(map[string]*cron.Cron)
-	CronEntries    = make(map[string]cron.EntryID)
-	cronMutex      sync.Mutex
-)
-
 //+kubebuilder:rbac:groups=k8s.cubrid.com,resources=backupdbs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.cubrid.com,resources=backupdbs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=k8s.cubrid.com,resources=backupdbs/finalizers,verbs=update
@@ -83,8 +76,6 @@ func (r *BackupDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if !backupDB.ObjectMeta.DeletionTimestamp.IsZero() {
-		r.removeCronScheduler(req.Name)
-
 		controllerutil.RemoveFinalizer(&backupDB, backupDB.Name)
 		if err := r.Update(ctx, &backupDB); err != nil {
 			return ctrl.Result{}, err
@@ -105,7 +96,6 @@ func (r *BackupDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		backupDB.Status.CommandStatus = settings.BackupDB_INPROGRESS
 		backupDB.Status.Message = "Command is being sent"
 		if err := r.Status().Update(ctx, &backupDB); err != nil {
-			log.Error(err, "Failed to update BackupDB status to InProgress")
 			return ctrl.Result{}, err
 		}
 
@@ -143,21 +133,22 @@ func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *k8sv1.Ba
 	}
 
 	if pod.Status.Phase != corev1.PodRunning {
-		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, "Pod not found or inaccessible")
-		return fmt.Errorf("failed to get pod %s: %v", podName, err)
+		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, string(pod.Status.Phase))
+		return fmt.Errorf("pod(%s) is not Running state", podName)
 	}
 
 	isContainersRunning, err := pkg.AllContainersRunning(&pod)
 	if err != nil {
-		return fmt.Errorf("container is not in Running state %s: %v", podName, err)
+		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, err.Error())
+		return err
 	}
 
 	if !isContainersRunning {
-		return fmt.Errorf("not all containers are in Running state, requeueing %s: %v", podName, err)
+		return fmt.Errorf("not all containers are in Running state. %s: %v", podName, err)
 	}
 
 	if err := r.execCommandInPod(r.Config, namespace, podName, pod.Spec.Containers[0].Name, getBackupDBCommand(backupDB)); err != nil {
-		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, fmt.Sprintf("Command failed: %v", err))
+		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, err.Error())
 		return fmt.Errorf("command failed: %v", err)
 	}
 
@@ -186,7 +177,7 @@ func (r *BackupDBReconciler) getMountPathFromCubriddb(
 	var cubridDB cubridv1.CubridDB
 	err := r.Get(ctx, client.ObjectKey{Name: podBaseName, Namespace: namespace}, &cubridDB)
 	if err != nil {
-		return "", fmt.Errorf("not found cubridDB object, err : %v\n", err)
+		return "", fmt.Errorf("not found cubridDB object, err : %v", err)
 	}
 
 	for _, storage := range cubridDB.Spec.Storage {
@@ -243,24 +234,6 @@ func (r *BackupDBReconciler) addFinalizer(ctx context.Context, backupDB *k8sv1.B
 		return r.Update(ctx, backupDB)
 	}
 	return nil
-}
-
-func (r *BackupDBReconciler) removeCronScheduler(resourceName string) {
-	cronMutex.Lock()
-	defer cronMutex.Unlock()
-
-	if scheduler, exists := cronSchedulers[resourceName]; exists {
-
-		for scheduleName, entryID := range CronEntries {
-			if strings.HasPrefix(scheduleName, resourceName+"_schedule_") {
-				scheduler.Remove(entryID)
-				delete(CronEntries, scheduleName)
-			}
-		}
-
-		scheduler.Stop()
-		delete(cronSchedulers, resourceName)
-	}
 }
 
 func (r *BackupDBReconciler) updateCommandStatus(ctx context.Context, backupdb *k8sv1.BackupDB, status, message string) {
