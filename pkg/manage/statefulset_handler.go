@@ -13,7 +13,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -37,25 +37,25 @@ func (r *StatefulSetHandler) HandleStatefulSet(ctx context.Context, cubridDB *cu
 	stslogger.V(1).Info("Handling StatefulSet for CubridDB")
 
 	var replicaNum int32 = 1
-	var serviceName string = cubridDB.Name + settings.SVC_SUFFIX
+	var serviceName string = cubridDB.Name + DEF.SVC_NAME_SUFFIX
 
 	if cubridDB.Spec.Replication.Enable {
 		replicaNum = cubridDB.Spec.Replication.Replicas
 	}
 
 	copyConfVolumeMountSpecs := []pkg.VolumeMountConfig{
-		{Name: settings.ConfBackupVolumeName, MountPath: settings.ConfBackupMountPath},
-		{Name: settings.LogsBackupVolumeName, MountPath: settings.LogsBackupMountPath},
-		{Name: settings.DBBackupVolumeName, MountPath: settings.DBBackupMountPath},
+		{Name: DEF.ConfBackupVolumeName, MountPath: DEF.ConfBackupMountPath},
+		{Name: DEF.LogsBackupVolumeName, MountPath: DEF.LogsBackupMountPath},
+		{Name: DEF.DBBackupVolumeName, MountPath: DEF.DBBackupMountPath},
 	}
 
 	recoveryConfVolumeMountSpecs := []pkg.VolumeMountConfig{
-		{Name: settings.ConfStorageVolumeName, MountPath: settings.ConfMountPath},
-		{Name: settings.DatabaseStorageVolumeName, MountPath: settings.DatabaseMountPath},
-		{Name: settings.BackupDBStorageVolumeName, MountPath: settings.BackupDBMountPath},
-		{Name: settings.LogsStorageVolumeName, MountPath: settings.LogsMountPath},
-		{Name: settings.ConfBackupVolumeName, MountPath: settings.ConfBackupMountPath},
-		{Name: settings.LogsBackupVolumeName, MountPath: settings.LogsBackupMountPath},
+		{Name: DEF.ConfStorageVolumeName, MountPath: DEF.ConfMountPath},
+		{Name: DEF.DatabaseStorageVolumeName, MountPath: DEF.DatabaseMountPath},
+		{Name: DEF.BackupDBStorageVolumeName, MountPath: DEF.BackupDBMountPath},
+		{Name: DEF.LogsStorageVolumeName, MountPath: DEF.LogsMountPath},
+		{Name: DEF.ConfBackupVolumeName, MountPath: DEF.ConfBackupMountPath},
+		{Name: DEF.LogsBackupVolumeName, MountPath: DEF.LogsBackupMountPath},
 	}
 
 	initContainers := pkg.CreateInitContainers(cubridDB, copyConfVolumeMountSpecs, recoveryConfVolumeMountSpecs)
@@ -63,26 +63,26 @@ func (r *StatefulSetHandler) HandleStatefulSet(ctx context.Context, cubridDB *cu
 	containers := []corev1.Container{
 		pkg.CreateContainers(cubridDB.Name,
 			cubridDB.Spec.Image,
-			pkg.ConfigureSecurityContext(settings.CubridUser, settings.CubridGroup),
+			pkg.ConfigureSecurityContext(DEF.CubridUser, DEF.CubridGroup),
 			pkg.CreateContainerPorts(ctx, cubridDB),
 			pkg.CreateVolumeMountsForCubridDB(cubridDB)),
 	}
 
 	volumes := []corev1.Volume{
 		{
-			Name: settings.ConfBackupVolumeName,
+			Name: DEF.ConfBackupVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 		{
-			Name: settings.LogsBackupVolumeName,
+			Name: DEF.LogsBackupVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 		{
-			Name: settings.DBBackupVolumeName,
+			Name: DEF.DBBackupVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
@@ -93,7 +93,7 @@ func (r *StatefulSetHandler) HandleStatefulSet(ctx context.Context, cubridDB *cu
 	var group_type string = ""
 	if cubridDB.IsHAEnabled() {
 		group_type = cubridDB.HAmodeType()
-		if cubridDB.HAmodeType() == settings.HA_REPLICA_TYPE {
+		if cubridDB.HAmodeType() == DEF.HA_REPLICA_TYPE {
 			group_name = cubridDB.Spec.Replication.HAmodeType.CubridRef.Name
 		}
 	}
@@ -102,7 +102,7 @@ func (r *StatefulSetHandler) HandleStatefulSet(ctx context.Context, cubridDB *cu
 		pkg.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
 		initContainers,
 		containers,
-		pkg.CreatePodSecurityContext(settings.CubridUser, settings.CubridGroup),
+		pkg.CreatePodSecurityContext(DEF.CubridUser, DEF.CubridGroup),
 		volumes,
 		pkg.CreateAffinity(cubridDB),
 	)

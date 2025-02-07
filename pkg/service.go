@@ -29,6 +29,7 @@ func CreateServiceSpec(svcSelector string, svcType corev1.ServiceType, ports []c
 	}
 }
 
+// Setting up one port in SVC
 func CreatePort(
 	name string,
 	servicePort int32,
@@ -47,6 +48,7 @@ func CreatePort(
 	return ports
 }
 
+// Setting up multiple ports in SVC
 func CreateNodePorts(cubridDB *cubridv1.CubridDB) []corev1.ServicePort {
 	servicePorts := make([]corev1.ServicePort, 0, len(cubridDB.Spec.Broker))
 

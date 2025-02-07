@@ -24,8 +24,8 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	"github.com/cubrid/cubrid-operator/pkg/manage"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -213,9 +213,9 @@ func (r *CubridDBReconciler) podUpdated(oldObj, newObj interface{}) {
 			replicaPods := []string{}
 
 			for _, pod := range podsInGroup {
-				if pod.Labels["grouptype"] == settings.HA_MASTER_SLAVE_TYPE {
+				if pod.Labels["grouptype"] == DEF.HA_MASTER_SLAVE_TYPE {
 					masterPods = append(masterPods, pod.Name)
-				} else if pod.Labels["grouptype"] == settings.HA_REPLICA_TYPE {
+				} else if pod.Labels["grouptype"] == DEF.HA_REPLICA_TYPE {
 					replicaPods = append(replicaPods, pod.Name)
 				}
 
@@ -302,9 +302,9 @@ func (r *CubridDBReconciler) cubridAdded(obj interface{}) {
 	cubriddblog.V(1).Info("cubridAdded", "CubridDB Name", cubriddb.Name)
 
 	if cubriddb.Spec.Replication != nil && cubriddb.Spec.Replication.HAmodeType != nil {
-		if cubriddb.Spec.Replication.HAmodeType.Type == settings.HA_MASTER_SLAVE_TYPE {
+		if cubriddb.Spec.Replication.HAmodeType.Type == DEF.HA_MASTER_SLAVE_TYPE {
 
-		} else if cubriddb.Spec.Replication.HAmodeType.Type == settings.HA_REPLICA_TYPE {
+		} else if cubriddb.Spec.Replication.HAmodeType.Type == DEF.HA_REPLICA_TYPE {
 			msCubridDB, err = pkg.GetCubridDBByName(
 				r.Client,
 				cubriddb.Namespace,
@@ -315,7 +315,7 @@ func (r *CubridDBReconciler) cubridAdded(obj interface{}) {
 				return
 			}
 
-			err = pkg.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, settings.ADD_REPLICALINK)
+			err = pkg.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, DEF.ADD_REPLICALINK)
 			if err != nil {
 				cubriddblog.V(1).Info(fmt.Sprintf("Failed to update replica link : Master CubridDB Name %s, Replica CubridDB Name %s",
 					msCubridDB.Name, cubriddb.Name), "error", err.Error())
@@ -334,7 +334,7 @@ func (r *CubridDBReconciler) cubridDeleted(obj interface{}) {
 		return
 	}
 
-	if cubriddb.Replication().Enable && cubriddb.HAmodeType() == settings.HA_REPLICA_TYPE {
+	if cubriddb.Replication().Enable && cubriddb.HAmodeType() == DEF.HA_REPLICA_TYPE {
 		msCubridDB, err = pkg.GetCubridDBByName(
 			r.Client,
 			cubriddb.Namespace,
@@ -346,7 +346,7 @@ func (r *CubridDBReconciler) cubridDeleted(obj interface{}) {
 			return
 		}
 
-		err = pkg.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, settings.DELETE_REPLICALINK)
+		err = pkg.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, DEF.DELETE_REPLICALINK)
 		if err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("Failed to delete replica link : Master CubridDB Name %s, Replica CubridDB Name %s",
 				msCubridDB.Name, cubriddb.Name), "errro", err.Error())

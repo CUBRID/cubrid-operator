@@ -1,5 +1,9 @@
 package settings
 
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
 const (
 	CubridDefaultImage        = "cubrid/cubrid:latest"
 	DefaultCUBRIDPath         = "/home/cubrid/CUBRID"
@@ -47,8 +51,16 @@ const (
 
 	HA_MASTER_SLAVE_TYPE = "master-slave"
 	HA_REPLICA_TYPE      = "replica"
-	SVC_SUFFIX           = "-int"
-	SELECTOR_SUFFIX      = "-group"
+
+	SELECTOR_SUFFIX = "-group"
+
+	// Service
+	SVC_NAME_SUFFIX          = "-int"
+	SVC_TYPE_NODE_PORT       = string(corev1.ServiceTypeClusterIP)
+	SVC_TYPE_CLUSTER_IP      = string(corev1.ServiceTypeClusterIP)
+	SVC_PORT_SUFFIX          = "-port"
+	SVC_BR_NAME_QUERY_EDITOR = "cubrid-query-editor"
+	SVC_BR_NAME_BROKER1      = "cubrid-broker1"
 
 	ADD_REPLICALINK    = 0
 	DELETE_REPLICALINK = 1

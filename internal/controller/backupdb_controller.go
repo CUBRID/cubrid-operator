@@ -37,7 +37,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 )
 
 // BackupDBReconciler reconciles a BackupDB object
@@ -81,13 +81,13 @@ func (r *BackupDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if backupDB.Status.CommandStatus == settings.BackupDB_PENDING ||
-		backupDB.Status.CommandStatus == settings.BackupDB_FAILED ||
+	if backupDB.Status.CommandStatus == DEF.BackupDB_PENDING ||
+		backupDB.Status.CommandStatus == DEF.BackupDB_FAILED ||
 		isCommandChanged(&backupDB) {
 
 		backupDB.Status.Command = getCommandArgs(&backupDB)
 		backupDB.Status.FilePath = getCommandFile(&backupDB)
-		backupDB.Status.CommandStatus = settings.BackupDB_INPROGRESS
+		backupDB.Status.CommandStatus = DEF.BackupDB_INPROGRESS
 		backupDB.Status.Message = "Command is being sent"
 		if err := r.Status().Update(ctx, &backupDB); err != nil {
 			return ctrl.Result{}, err
@@ -116,24 +116,24 @@ func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *cubridv1
 
 	var pod corev1.Pod
 	if err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: podName}, &pod); err != nil {
-		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, "Pod not found or inaccessible")
+		r.updateCommandStatus(ctx, backupDB, DEF.BackupDB_FAILED, "Pod not found or inaccessible")
 		return fmt.Errorf("failed to get pod %s: %v", podName, err)
 	}
 
 	_, err := r.getMountPathFromCubriddb(ctx, backupDB, podName, namespace, storageType)
 	if err != nil {
-		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, "Could not find the path to store backupdb")
+		r.updateCommandStatus(ctx, backupDB, DEF.BackupDB_FAILED, "Could not find the path to store backupdb")
 		return err
 	}
 
 	if pod.Status.Phase != corev1.PodRunning {
-		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, string(pod.Status.Phase))
+		r.updateCommandStatus(ctx, backupDB, DEF.BackupDB_FAILED, string(pod.Status.Phase))
 		return fmt.Errorf("pod(%s) is not Running state", podName)
 	}
 
 	isContainersRunning, err := pkg.AllContainersRunning(&pod)
 	if err != nil {
-		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, err.Error())
+		r.updateCommandStatus(ctx, backupDB, DEF.BackupDB_FAILED, err.Error())
 		return err
 	}
 
@@ -142,11 +142,11 @@ func (r *BackupDBReconciler) sendCommand(ctx context.Context, backupDB *cubridv1
 	}
 
 	if err := r.execCommandInPod(r.Config, namespace, podName, pod.Spec.Containers[0].Name, getBackupDBCommand(backupDB)); err != nil {
-		r.updateCommandStatus(ctx, backupDB, settings.BackupDB_FAILED, err.Error())
+		r.updateCommandStatus(ctx, backupDB, DEF.BackupDB_FAILED, err.Error())
 		return fmt.Errorf("command failed: %v", err)
 	}
 
-	r.updateCommandStatus(ctx, backupDB, settings.BackupDB_COMPLETED, "Command sent successfully")
+	r.updateCommandStatus(ctx, backupDB, DEF.BackupDB_COMPLETED, "Command sent successfully")
 	return nil
 }
 
@@ -286,7 +286,7 @@ func getCommandFile(backupDB *cubridv1.BackupDB) string {
 
 	filePath := backupDB.Spec.CommandArgs.FilePath
 	if filePath == "" {
-		filePath = settings.BackupDB_Script_File_Path
+		filePath = DEF.BackupDB_Script_File_Path
 	}
 
 	return filePath

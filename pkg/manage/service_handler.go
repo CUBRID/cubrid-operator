@@ -15,7 +15,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 )
 
 const (
@@ -52,7 +52,7 @@ func (r *ServiceHandler) HandleService(ctx context.Context, cubridDB *cubridv1.C
 
 	for _, bs := range cubridDB.Spec.Broker {
 		ports := pkg.CreatePort(
-			"broker-port",
+			bs.Name+DEF.SVC_PORT_SUFFIX,
 			bs.ServicePort,
 			bs.Port,
 			corev1.ProtocolTCP,
@@ -100,7 +100,7 @@ func (r *ServiceHandler) HandleHeadlessService(ctx context.Context, cubridDB *cu
 
 	ports := pkg.CreatePort(ServicePort_Name, HA_PORT, HA_PORT, corev1.ProtocolTCP, corev1.ServiceTypeClusterIP)
 	headlessService := pkg.CreateService(
-		cubridDB.Name+settings.SVC_SUFFIX,
+		cubridDB.Name+DEF.SVC_NAME_SUFFIX,
 		cubridDB.Namespace,
 		cubridDB.Name,
 		corev1.ServiceTypeClusterIP,

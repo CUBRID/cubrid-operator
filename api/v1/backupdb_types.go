@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -105,8 +105,8 @@ func (b *BackupDB) StorageRef() *StorageRef {
 func (b *BackupDB) CommandArgs() *CommandArgs {
 	if b.Spec.CommandArgs == nil {
 		defaultCommand := &CommandArgs{
-			FilePath: settings.BackupDB_Script_File_Path,
-			Args:     settings.BackupdbArgs,
+			FilePath: DEF.BackupDB_Script_File_Path,
+			Args:     DEF.BackupdbArgs,
 		}
 		b.Spec.CommandArgs = defaultCommand
 	}
@@ -124,7 +124,7 @@ func (b *BackupDB) BackupDBStatus() *BackupDBStatus {
 	}
 
 	if b.Status.CommandStatus == "" {
-		b.Status.CommandStatus = settings.BackupDB_IDLE
+		b.Status.CommandStatus = DEF.BackupDB_IDLE
 	}
 
 	if b.Status.Message == "" {

@@ -15,7 +15,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
@@ -51,17 +51,18 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 		var retToken string
 		var isSuccess bool = false
 
-		httpUrls, errCode = pkg.CreatePodFullURLs(ctx, client, cubriddb.Name, cubriddb.Namespace, settings.CMS_PORT)
+		httpUrls, errCode = pkg.CreatePodFullURLs(ctx, client, cubriddb.Name, cubriddb.Namespace, DEF.CMS_PORT)
 		if errCode != nil {
 			errorMessage = fmt.Errorf("error CreatePodFullURLs: %v", errCode)
 			goto End
 		}
 
 		for _, url := range httpUrls {
-			retToken, errCode = r.loginToCMServer(url, settings.CMS_ID, settings.CMS_PW, settings.CMS_VERSION)
+			retToken, errCode = r.loginToCMServer(url, DEF.CMS_ID, DEF.CMS_PW, DEF.CMS_VERSION)
 			if errCode != nil {
 				continue
 			}
+
 			podUrl = url
 			token = retToken
 
@@ -97,31 +98,28 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 
 	End:
 		if isError {
-			cubriddb.Status.HaMode = settings.HAMODE_ON
+			cubriddb.Status.HaMode = DEF.HAMODE_ON
 			cubriddb.Status.NodeLists = make(map[string]string)
 			cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
-			cubriddb.Status.CurrentMaster = settings.HAMODE_UNKONW
+			cubriddb.Status.CurrentMaster = DEF.HAMODE_UNKONW
 		} else {
 
-			cubriddb.Status.HaMode = settings.HAMODE_ON
+			cubriddb.Status.HaMode = DEF.HAMODE_ON
 			cubriddb.Status.NodeLists = listStatus
 			cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
 
 			for node, state := range listStatus {
-				if state == settings.HAMODE_MASTER {
+				if state == DEF.HAMODE_MASTER {
 					cubriddb.Status.CurrentMaster = node
 					break
 				}
 			}
 		}
 	} else {
-
-		cubriddb.Status.HaMode = settings.HAMODE_OFF
+		cubriddb.Status.HaMode = DEF.HAMODE_OFF
 		cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
-		cubriddb.Status.NodeLists = map[string]string{
-			cubriddb.Name: settings.HAMODE_STANDALONE,
-		}
-		cubriddb.Status.CurrentMaster = settings.HAMODE_STANDALONE
+		cubriddb.Status.NodeLists = map[string]string{cubriddb.Name: DEF.HAMODE_STANDALONE}
+		cubriddb.Status.CurrentMaster = cubriddb.Name
 	}
 
 	newStatusWithoutLastUpdated := cubriddb.Status.DeepCopy()
@@ -182,7 +180,7 @@ func parseHANodesStatus(responseMap map[string]interface{}) (map[string]string, 
 		return nil, fmt.Errorf("no valid nodes found in ha_status response")
 	}
 
-	priority := map[string]int{settings.HAMODE_MASTER: 0, settings.HAMODE_SLAVE: 1, settings.HAMODE_REPLICA: 2}
+	priority := map[string]int{DEF.HAMODE_MASTER: 0, DEF.HAMODE_SLAVE: 1, DEF.HAMODE_REPLICA: 2}
 
 	sortedNodes := make([]nodeStatus, 0, len(replicationStatus))
 	for node, state := range replicationStatus {
@@ -287,7 +285,7 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 
 func createLoginCommand(id, password, clientver string) *pkg.Command {
 	command := &pkg.Command{
-		Task: settings.CMS_CMD_LOGIN,
+		Task: DEF.CMS_CMD_LOGIN,
 		Extra: map[string]interface{}{
 			"id":        id,
 			"password":  password,
@@ -312,7 +310,7 @@ func createStatusCommand(token string) (*pkg.Command, error) {
 
 	// 상태 명령어 생성
 	builder := pkg.NewCommandBuilder(token)
-	return builder.CreateCommand(settings.CMS_CMD_HA_STATUS, extra)
+	return builder.CreateCommand(DEF.CMS_CMD_HA_STATUS, extra)
 }
 
 func (r *CubridDBReconciler) getCredentialsFromSecret(ctx context.Context, secretName, namespace string) (string, string, string, error) {

@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -15,7 +15,7 @@ func NewLabelSelector(appName, groupName, groupType, serviceName string) *metav1
 	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			"app":         appName,
-			"group":       groupName + settings.SELECTOR_SUFFIX, // airnet check
+			"group":       groupName + DEF.SELECTOR_SUFFIX,
 			"grouptype":   groupType,
 			"servicename": serviceName,
 		},

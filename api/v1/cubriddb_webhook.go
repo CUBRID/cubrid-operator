@@ -20,7 +20,7 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -155,14 +155,14 @@ func (c *CubridDB) validateUpdateHA(old runtime.Object) error {
 					"HAModeType cannot be changed."))
 		}
 
-		if (c.HAmodeType() != settings.HA_MASTER_SLAVE_TYPE) && (c.HAmodeType() != settings.HA_REPLICA_TYPE) {
+		if (c.HAmodeType() != DEF.HA_MASTER_SLAVE_TYPE) && (c.HAmodeType() != DEF.HA_REPLICA_TYPE) {
 			allErrs = append(allErrs,
 				field.Invalid(field.NewPath("spec").Child("replication").Child("hamodetype").Child("type"),
 					c.Spec.Replication.HAmodeType.Type,
 					"HAmodeType must be set to master-slave or replica only."))
 		}
 
-		if c.Replication().HAmodeType.Type == settings.HA_REPLICA_TYPE {
+		if c.Replication().HAmodeType.Type == DEF.HA_REPLICA_TYPE {
 			if c.Replication().HAmodeType.CubridRef.Name == "" {
 				allErrs = append(allErrs,
 					field.Invalid(field.NewPath("spec").Child("replication").Child("hamodetype").Child("cubridref").Child("name"),
@@ -234,7 +234,7 @@ func (c *CubridDB) validateCubridDBByRefName() error {
 
 	// Replica type 인 경우, CubridRef.Name 이 있는지 체크한다.
 	refName := c.Spec.Replication.HAmodeType.CubridRef.Name
-	if c.HAmodeType() == settings.HA_REPLICA_TYPE && c.Spec.Replication.HAmodeType.CubridRef.Name == "" {
+	if c.HAmodeType() == DEF.HA_REPLICA_TYPE && c.Spec.Replication.HAmodeType.CubridRef.Name == "" {
 		// ref.name이 없으면 오류를 반환합니다.
 		return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
 			field.Invalid(field.NewPath("Spec").Child("Replication").Child("HAmodeType").Child("CubridRef").Child("Name"),
@@ -244,7 +244,7 @@ func (c *CubridDB) validateCubridDBByRefName() error {
 
 	// Replica type인 경우, Replica에서 참조 하는 Master-Slave type이 중복되면 안된다.
 	// Replica에서 참조하는 Master-Slae 중복되는지 체크한다.
-	if c.HAmodeType() == settings.HA_REPLICA_TYPE {
+	if c.HAmodeType() == DEF.HA_REPLICA_TYPE {
 		existingCubridDBList := &CubridDBList{} // CubridDBList를 사용하여 다수의 CubridDB 리소스를 찾습니다.
 		err := cubClient.List(context.Background(), existingCubridDBList, &client.ListOptions{
 			Namespace: c.Namespace,

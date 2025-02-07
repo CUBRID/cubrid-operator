@@ -19,7 +19,7 @@ package v1
 import (
 	"strings"
 
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,10 +31,10 @@ import (
 )
 
 var validStorageTypes = []string{
-	settings.StorageType_Database,
-	settings.StorageType_Logs,
-	settings.StorageType_backup,
-	settings.StorageType_conf,
+	DEF.StorageType_Database,
+	DEF.StorageType_Logs,
+	DEF.StorageType_backup,
+	DEF.StorageType_conf,
 }
 
 // log is for logging in this package.
@@ -79,35 +79,35 @@ func (b *BackupDB) initCburidRef() {
 func (b *BackupDB) initCommand() {
 	sc := b.CommandArgs()
 	if sc.FilePath == "" {
-		sc.FilePath = settings.BackupDB_Script_File_Path
+		sc.FilePath = DEF.BackupDB_Script_File_Path
 	}
 
 	if len(sc.Args) == 0 {
-		sc.Args = settings.BackupdbArgs
+		sc.Args = DEF.BackupdbArgs
 	}
 }
 
 func (b *BackupDB) initStroageRef() {
 	sr := b.StorageRef()
 	if sr.StorageType == "" {
-		sr.StorageType = settings.BackupDB_StorageType
+		sr.StorageType = DEF.BackupDB_StorageType
 	}
 	backupdblog.Info("initStroageRef", "sr.StorageType", sr.StorageType)
 }
 
 func (b *BackupDB) initStatus() {
 	if b.Status.Command == "" {
-		b.Status.Command = strings.Join(settings.BackupdbArgs, "")
+		b.Status.Command = strings.Join(DEF.BackupdbArgs, "")
 	}
 	backupdblog.Info("initStatus", "Command", b.Status.Command)
 
 	if b.Status.FilePath == "" {
-		b.Status.FilePath = settings.BackupDB_Script_File_Path
+		b.Status.FilePath = DEF.BackupDB_Script_File_Path
 	}
 
 	backupdblog.Info("initStatus", "File", b.Status.FilePath)
 	if b.Status.CommandStatus == "" {
-		b.Status.CommandStatus = settings.BackupDB_IDLE
+		b.Status.CommandStatus = DEF.BackupDB_IDLE
 	}
 	backupdblog.Info("initStatus", "CommandStatus", b.Status.CommandStatus)
 }

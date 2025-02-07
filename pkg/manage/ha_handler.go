@@ -9,7 +9,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,7 +49,7 @@ func (r *HAHandler) HandleHAMode(
 	var msCubridDBName, replicaCubridDBName string
 
 	switch cubridDB.HAmodeType() {
-	case settings.HA_MASTER_SLAVE_TYPE:
+	case DEF.HA_MASTER_SLAVE_TYPE:
 		msCubridDBName = cubridDB.Name
 
 		// Ensure that CubridRef is initialized
@@ -69,7 +69,7 @@ func (r *HAHandler) HandleHAMode(
 			return result, err
 		}
 
-	case settings.HA_REPLICA_TYPE:
+	case DEF.HA_REPLICA_TYPE:
 		hahandlelog.Info("Replica info", "Replica Name", cubridDB.Name)
 
 		replicaCubridDBName = cubridDB.Name
@@ -84,7 +84,7 @@ func (r *HAHandler) HandleHAMode(
 		}
 
 	default:
-		return ctrl.Result{}, fmt.Errorf("It is an unknown HA Mode type. : %s", cubridDB.HAmodeType())
+		return ctrl.Result{}, fmt.Errorf("it is an unknown HA Mode type. : %s", cubridDB.HAmodeType())
 	}
 
 	return result, nil
@@ -301,7 +301,7 @@ func updateMasterSlaveCommand(haNodeList, haCopySyncMode string) []string {
 
 	// cubrid.conf
 	haModeStr := fmt.Sprintf(
-		settings.HaModeTemplate,
+		DEF.HaModeTemplate,
 		cubridPath,
 		cubridPath,
 		cubridPath,
@@ -309,7 +309,7 @@ func updateMasterSlaveCommand(haNodeList, haCopySyncMode string) []string {
 
 	// cubrid_ha.conf
 	haCommonStr := fmt.Sprintf(
-		settings.HaCommonConfigTemplate,
+		DEF.HaCommonConfigTemplate,
 		cubridPath,
 		cubridPath,
 		cubridPath,
@@ -318,7 +318,7 @@ func updateMasterSlaveCommand(haNodeList, haCopySyncMode string) []string {
 	)
 
 	haNodeListsStr := fmt.Sprintf(
-		settings.HaNodeListTemplate,
+		DEF.HaNodeListTemplate,
 		cubridPath,
 		haNodeList,
 		cubridPath,
@@ -327,7 +327,7 @@ func updateMasterSlaveCommand(haNodeList, haCopySyncMode string) []string {
 	)
 
 	haSyncModeStr := fmt.Sprintf(
-		settings.HaSyncModeTemplate,
+		DEF.HaSyncModeTemplate,
 		cubridPath,
 		haCopySyncMode,
 		cubridPath,
@@ -336,7 +336,7 @@ func updateMasterSlaveCommand(haNodeList, haCopySyncMode string) []string {
 	)
 
 	logMaxArchivesStr := fmt.Sprintf(
-		settings.HaLogMaxArchivesTemplate,
+		DEF.HaLogMaxArchivesTemplate,
 		cubridPath,
 		cubridPath,
 		cubridPath,
@@ -352,7 +352,7 @@ func updateHAReplicaCommand(haReplicaList string) []string {
 
 	// cubrid.conf
 	haModeReplicaStr := fmt.Sprintf(
-		settings.HaReplicaModeTemplate,
+		DEF.HaReplicaModeTemplate,
 		cubridPath,
 		cubridPath,
 		cubridPath,
@@ -360,7 +360,7 @@ func updateHAReplicaCommand(haReplicaList string) []string {
 
 	// cubrid_ha.conf
 	haCommonStr := fmt.Sprintf(
-		settings.HaCommonConfigTemplate,
+		DEF.HaCommonConfigTemplate,
 		cubridPath,
 		cubridPath,
 		cubridPath,
@@ -369,7 +369,7 @@ func updateHAReplicaCommand(haReplicaList string) []string {
 	)
 
 	haReplicaListStr := fmt.Sprintf(
-		settings.HaReplicaListTemplate,
+		DEF.HaReplicaListTemplate,
 		cubridPath,
 		haReplicaList,
 		cubridPath,
@@ -378,7 +378,7 @@ func updateHAReplicaCommand(haReplicaList string) []string {
 	)
 
 	logMaxArchivesStr := fmt.Sprintf(
-		settings.HaLogMaxArchivesTemplate,
+		DEF.HaLogMaxArchivesTemplate,
 		cubridPath,
 		cubridPath,
 		cubridPath,
@@ -393,14 +393,14 @@ func getMSNodeListCommand(haNodeList string, haCopySyncMode string) []string {
 	cubridPath := getCubridPath()
 
 	haNodeListStr := fmt.Sprintf(
-		settings.HaNodeListTemplate,
+		DEF.HaNodeListTemplate,
 		cubridPath, haNodeList,
 		cubridPath, haNodeList,
 		cubridPath,
 	)
 
 	haSyncModeStr := fmt.Sprintf(
-		settings.HaSyncModeTemplate,
+		DEF.HaSyncModeTemplate,
 		cubridPath,
 		haCopySyncMode,
 		cubridPath,
@@ -416,7 +416,7 @@ func updateReplicaCommand(haReplicaList string) []string {
 	cubridPath := getCubridPath()
 
 	haReplicaListStr := fmt.Sprintf(
-		settings.HaReplicaListTemplate,
+		DEF.HaReplicaListTemplate,
 		cubridPath,
 		haReplicaList,
 		cubridPath,
@@ -431,7 +431,7 @@ func updateReplicaCommand(haReplicaList string) []string {
 func deleteReplicaCommand() []string {
 	cubridPath := getCubridPath()
 
-	haReplicaListStr := fmt.Sprintf(settings.DelReplicaListTemplate, cubridPath)
+	haReplicaListStr := fmt.Sprintf(DEF.DelReplicaListTemplate, cubridPath)
 
 	command := haReplicaListStr
 	return []string{"sh", "-c", command}
@@ -574,7 +574,7 @@ func (r *HAHandler) getCubridDBPodList(
 func getCubridPath() string {
 	cubridUserPath := os.Getenv("CUBRID")
 	if cubridUserPath == "" {
-		cubridUserPath = settings.DefaultCUBRIDPath
+		cubridUserPath = DEF.DefaultCUBRIDPath
 	}
 
 	return cubridUserPath

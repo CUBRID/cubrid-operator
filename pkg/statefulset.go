@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -22,7 +22,7 @@ func CreateStatefulSet(
 	var group_type string = ""
 	if cubridDB.IsHAEnabled() {
 		group_type = cubridDB.HAmodeType()
-		if group_type == settings.HA_REPLICA_TYPE {
+		if group_type == DEF.HA_REPLICA_TYPE {
 			group_name = cubridDB.Spec.Replication.HAmodeType.CubridRef.Name
 		}
 	}

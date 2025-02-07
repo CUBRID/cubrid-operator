@@ -19,7 +19,7 @@ package v1
 import (
 	"fmt"
 
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -155,7 +155,7 @@ func (r *Replication) FillWithDefaults() {
 		r.HAmodeType.Type = ""
 	} else {
 		if r.HAmodeType.Type == "" {
-			r.HAmodeType.Type = settings.HA_MASTER_SLAVE_TYPE
+			r.HAmodeType.Type = DEF.HA_MASTER_SLAVE_TYPE
 		}
 	}
 
@@ -198,22 +198,22 @@ func (c *CubridDB) InternalServiceKey() types.NamespacedName {
 }
 
 func InternalServiceName(cubriddbName string) string {
-	return fmt.Sprintf("%s-internal", cubriddbName)
+	return fmt.Sprintf("%s%s", cubriddbName, DEF.SVC_NAME_SUFFIX)
 }
 
 func (c *CubridDB) InitBroker() {
 	if len(c.Spec.Broker) == 0 {
 		broker1 := Broker{
-			Name:        "query-editor",
+			Name:        DEF.SVC_BR_NAME_QUERY_EDITOR,
 			Port:        30000,
-			ServiceType: "NodePort",
+			ServiceType: DEF.SVC_TYPE_NODE_PORT,
 			ServicePort: 30000,
 		}
 
 		broker2 := Broker{
-			Name:        "broker1",
+			Name:        DEF.SVC_BR_NAME_BROKER1,
 			Port:        33000,
-			ServiceType: "NodePort",
+			ServiceType: DEF.SVC_TYPE_NODE_PORT,
 			ServicePort: 31000,
 		}
 
@@ -223,45 +223,45 @@ func (c *CubridDB) InitBroker() {
 
 func (c *CubridDB) InitImage() {
 	if c.Spec.Image == "" {
-		c.Spec.Image = settings.CubridDefaultImage
+		c.Spec.Image = DEF.CubridDefaultImage
 	}
 }
 
 func (c *CubridDB) InitStorages() {
 	if len(c.Spec.Storage) == 0 {
-		size := resource.MustParse(settings.Default_Volume_Size)
+		size := resource.MustParse(DEF.Default_Volume_Size)
 		db_storage := Storage{
-			Name:             "database-storage",
-			Type:             settings.StorageType_Database,
+			Name:             DEF.DatabaseStorageVolumeName,
+			Type:             DEF.StorageType_Database,
 			MountPath:        "/home/cubrid/CUBRID/databases",
-			StorageClassName: settings.DefaultStorageClassName,
+			StorageClassName: DEF.DefaultStorageClassName,
 			Size:             &size,
 			VolumeName:       "",
 		}
 
 		log_storage := Storage{
-			Name:             "logs-storage",
-			Type:             settings.StorageType_Logs,
+			Name:             DEF.LogsStorageVolumeName,
+			Type:             DEF.StorageType_Logs,
 			MountPath:        "/home/cubrid/CUBRID/log",
-			StorageClassName: settings.DefaultStorageClassName,
+			StorageClassName: DEF.DefaultStorageClassName,
 			Size:             &size,
 			VolumeName:       "",
 		}
 
 		backupdb_storage := Storage{
-			Name:             "backupdb-storage",
-			Type:             settings.StorageType_backup,
+			Name:             DEF.BackupDBStorageVolumeName,
+			Type:             DEF.StorageType_backup,
 			MountPath:        "/home/cubrid/CUBRID/backupdb",
-			StorageClassName: settings.DefaultStorageClassName,
+			StorageClassName: DEF.DefaultStorageClassName,
 			Size:             &size,
 			VolumeName:       "",
 		}
 
 		conf_storage := Storage{
-			Name:             "conf-storage",
-			Type:             settings.StorageType_conf,
+			Name:             DEF.ConfStorageVolumeName,
+			Type:             DEF.StorageType_conf,
 			MountPath:        "/home/cubrid/CUBRID/conf",
-			StorageClassName: settings.DefaultStorageClassName,
+			StorageClassName: DEF.DefaultStorageClassName,
 			Size:             &size,
 			VolumeName:       "",
 		}

@@ -5,7 +5,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	v1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -37,16 +37,16 @@ func CreateInitContainers(
 ) []corev1.Container {
 	return []corev1.Container{
 		CreateInitContainer(
-			settings.InitCopyConfContainerName,
+			DEF.InitCopyConfContainerName,
 			cubridDB.Spec.Image,
-			[]string{"sh", "-c", settings.InitCopyConfCommand},
+			[]string{"sh", "-c", DEF.InitCopyConfCommand},
 			ConfigureSecurityContext(0, 0),
 			CreateVolumeMounts(copyConfVolumeMountSpecs),
 		),
 		CreateInitContainer(
-			settings.InitRecoveryConfContainerName,
-			settings.BusyBoxImage,
-			[]string{"sh", "-c", settings.InitRecoveryConfCommand},
+			DEF.InitRecoveryConfContainerName,
+			DEF.BusyBoxImage,
+			[]string{"sh", "-c", DEF.InitRecoveryConfCommand},
 			ConfigureSecurityContext(0, 0),
 			CreateVolumeMounts(recoveryConfVolumeMountSpecs),
 		),

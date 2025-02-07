@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg/settings"
+	DEF "github.com/cubrid/cubrid-operator/pkg/define"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -97,9 +97,9 @@ func GetCubridDBByName(c client.Client, namespace, name string) (*cubridv1.Cubri
 }
 
 func UpdateReplicaLink(c client.Client, cubridDB *cubridv1.CubridDB, name string, updatType int) error {
-	if updatType == settings.ADD_REPLICALINK {
+	if updatType == DEF.ADD_REPLICALINK {
 		AddReplicaLink(cubridDB, name)
-	} else if updatType == settings.DELETE_REPLICALINK {
+	} else if updatType == DEF.DELETE_REPLICALINK {
 		RemoveReplicaLink(cubridDB, name)
 	} else {
 		return nil
@@ -343,15 +343,15 @@ func FetchServiceName(ctx context.Context, c client.Client, name, namespace stri
 }
 
 func CreateDNSShortName(podName, serviceName string) string {
-	return fmt.Sprintf(settings.POD_DNS_SHORT_NAME, podName, serviceName)
+	return fmt.Sprintf(DEF.POD_DNS_SHORT_NAME, podName, serviceName)
 }
 
 func CreateDNSFullName(podName, serviceName, namespace string) string {
-	return fmt.Sprintf(settings.POD_DNS_FULL_NAME, podName, serviceName, namespace)
+	return fmt.Sprintf(DEF.POD_DNS_FULL_NAME, podName, serviceName, namespace)
 }
 
 func GenerateFullURL(podDNSName string, port int) string {
-	return fmt.Sprintf(settings.CMS_HTTPS_URL, podDNSName, port)
+	return fmt.Sprintf(DEF.CMS_HTTPS_URL, podDNSName, port)
 }
 
 func CreatePodFullURLs(
@@ -379,7 +379,7 @@ func CreatePodFullURLs(
 	urls := make([]string, 0, len(pods))
 	for _, pod := range pods {
 		podDNSName := CreateDNSFullName(pod.Name, serviceName, namespace)
-		fullURL := GenerateFullURL(podDNSName, settings.CMS_PORT)
+		fullURL := GenerateFullURL(podDNSName, DEF.CMS_PORT)
 		urls = append(urls, fullURL)
 	}
 
