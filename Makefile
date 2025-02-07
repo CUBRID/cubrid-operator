@@ -46,8 +46,19 @@ help: ## Display this help.
 CRD_DIR := config/charts/cubrid-operator-crds/templates
 COMBINED_CRD_FILE := $(CRD_DIR)/crds.yaml
 
-# CRD Path
+# CRDs Path
 CRD_SOURCES := config/crd/bases/k8s.cubrid.com_cubriddbs.yaml config/crd/bases/k8s.cubrid.com_backupdbs.yaml
+
+# Helm Chart Directory and Package Configuration
+CHARTS_DIR := config/charts
+HELM_REPO_DIR := helm-repo
+HELM_REPO_URL := https://airnet73.github.io/test-operator
+CHARTS := cubrid-operator cubrid-operator-crds
+
+# Helm Package Directory Creation
+$(HELM_REPO_DIR):
+	@mkdir -p $(HELM_REPO_DIR)
+
 
 # helm-crds 
 .PHONY: helm-crd
@@ -56,6 +67,22 @@ helm-crd: manifests ## Generate crd file for Helm Charts
 	@> $(COMBINED_CRD_FILE) 
 	@cat $(CRD_SOURCES) >> $(COMBINED_CRD_FILE) 
 	@echo "CRDs combined successfully into $(COMBINED_CRD_FILE)."
+
+
+.PHONY: helm-package 
+helm-package: $(CHARTS) ## Package All Charts (cubrid-operator, cubrid-operator-crds)
+$(CHARTS):
+	@echo "Packaging $@ chart..."
+	helm package $(CHARTS_DIR)/$@ --destination $(HELM_REPO_DIR)
+	@echo "$@ chart packaged successfully."
+
+# Create or Update Helm Repository Index
+.PHONY: helm-update-repo
+helm-update-repo: helm-package ## Create or Update Helm Repository Index
+	@echo "Updating Helm repository index..."
+	helm repo index $(HELM_REPO_DIR) --url $(HELM_REPO_URL)
+	@echo "Helm repository index updated successfully."
+
 
 
 ##@ Development
