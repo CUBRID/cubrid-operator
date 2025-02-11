@@ -23,23 +23,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type HAHandler struct {
+type HAManager struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Config *rest.Config
 }
 
-var hahandlelog = log.Log.WithName("StatufulSet")
+var halog = log.Log.WithName("HAMode")
 
-func NewHAHandler(client client.Client, scheme *runtime.Scheme, config *rest.Config) *HAHandler {
-	return &HAHandler{
+func NewHAManager(client client.Client, scheme *runtime.Scheme, config *rest.Config) *HAManager {
+	return &HAManager{
 		Client: client,
 		Scheme: scheme,
 		Config: config,
 	}
 }
 
-func (r *HAHandler) HandleHAMode(
+func (r *HAManager) HandleHAMode(
 	ctx context.Context,
 	cubridDB *cubridv1.CubridDB,
 	req ctrl.Request,
@@ -56,7 +56,7 @@ func (r *HAHandler) HandleHAMode(
 		replicaRef := pkg.InitCubridRef(cubridDB)
 		replicaCubridDBName = replicaRef.ReplicaLink
 
-		hahandlelog.Info("Master-Slave info", "Master-Slave", msCubridDBName, "Replica", replicaCubridDBName)
+		halog.Info("Master-Slave info", "Master-Slave", msCubridDBName, "Replica", replicaCubridDBName)
 
 		// Update the Master-Slave configuration
 		if result, err = r.SetMasterSlaveConfig(
@@ -70,7 +70,7 @@ func (r *HAHandler) HandleHAMode(
 		}
 
 	case DEF.HA_REPLICA_TYPE:
-		hahandlelog.Info("Replica info", "Replica Name", cubridDB.Name)
+		halog.Info("Replica info", "Replica Name", cubridDB.Name)
 
 		replicaCubridDBName = cubridDB.Name
 		cubridRef := cubridDB.Spec.Replication.HAmodeType.CubridRef
@@ -90,7 +90,7 @@ func (r *HAHandler) HandleHAMode(
 	return result, nil
 }
 
-func (r *HAHandler) SetMasterSlaveConfig(
+func (r *HAManager) SetMasterSlaveConfig(
 	ctx context.Context,
 	msCubridDBName,
 	rCubridDBName,
@@ -110,7 +110,7 @@ func (r *HAHandler) SetMasterSlaveConfig(
 	return ctrl.Result{}, nil
 }
 
-func (r *HAHandler) SetReplicaConfig(
+func (r *HAManager) SetReplicaConfig(
 	ctx context.Context,
 	masterName,
 	replicaName,
@@ -132,7 +132,7 @@ func (r *HAHandler) SetReplicaConfig(
 	return ctrl.Result{}, nil
 }
 
-func (r *HAHandler) settingHAMasterSlave(
+func (r *HAManager) settingHAMasterSlave(
 	ctx context.Context,
 	cubridDBName string,
 	namespace string,
@@ -154,13 +154,13 @@ func (r *HAHandler) settingHAMasterSlave(
 		}
 	} else {
 		// PodList가 0이면 haNodeList를 빈 문자열로 설정
-		hahandlelog.V(1).Info("Could not find a host to configure HA.")
+		halog.V(1).Info("Could not find a host to configure HA.")
 	}
 
 	return nil
 }
 
-func (r *HAHandler) updateHANodeListAndSyncMode(
+func (r *HAManager) updateHANodeListAndSyncMode(
 	ctx context.Context,
 	msName string,
 	rName string,
@@ -173,7 +173,7 @@ func (r *HAHandler) updateHANodeListAndSyncMode(
 	if msName != "" {
 		msPodLists, msServiceName, err := r.getCubridDBPodList(ctx, msName, namespace)
 		if err != nil {
-			hahandlelog.Error(err, "unable to fetch pods for StatefulSet")
+			halog.Error(err, "unable to fetch pods for StatefulSet")
 			return err
 		}
 
@@ -187,14 +187,14 @@ func (r *HAHandler) updateHANodeListAndSyncMode(
 				return err
 			}
 		} else {
-			hahandlelog.V(1).Info("No pods found")
+			halog.V(1).Info("No pods found")
 		}
 	}
 
 	if rName != "" {
 		rList, _, err := r.getCubridDBPodList(ctx, rName, namespace)
 		if err != nil {
-			hahandlelog.Error(err, "unable to fetch pods for StatefulSet")
+			halog.Error(err, "unable to fetch pods for StatefulSet")
 			return err
 		}
 
@@ -206,7 +206,7 @@ func (r *HAHandler) updateHANodeListAndSyncMode(
 	return nil
 }
 
-func (r *HAHandler) updateHAReplicaList(
+func (r *HAManager) updateHAReplicaList(
 	ctx context.Context,
 	msCubridDBName string,
 	replicaCubridDBName string,
@@ -231,14 +231,14 @@ func (r *HAHandler) updateHAReplicaList(
 				return err
 			}
 		} else {
-			hahandlelog.Info("No pods found", "repNodeListStr", repNodeListStr)
+			halog.Info("No pods found", "repNodeListStr", repNodeListStr)
 		}
 	}
 
 	if msCubridDBName != "" {
 		msPodLists, _, err := r.getCubridDBPodList(ctx, msCubridDBName, namespace)
 		if err != nil {
-			hahandlelog.Error(err, "unable to fetch pods for StatefulSet")
+			halog.Error(err, "unable to fetch pods for StatefulSet")
 			return err
 		}
 
@@ -255,7 +255,7 @@ func (r *HAHandler) updateHAReplicaList(
 	return nil
 }
 
-func (r *HAHandler) settingHAReplica(
+func (r *HAManager) settingHAReplica(
 	ctx context.Context,
 	statefulSetName string,
 	namespace string,
@@ -263,7 +263,7 @@ func (r *HAHandler) settingHAReplica(
 ) error {
 	podList, serviceName, err := r.getCubridDBPodList(ctx, statefulSetName, namespace)
 	if err != nil {
-		hahandlelog.Error(err, "unable to fetch pods for StatefulSet")
+		halog.Error(err, "unable to fetch pods for StatefulSet")
 		return err
 	}
 
@@ -276,7 +276,7 @@ func (r *HAHandler) settingHAReplica(
 			return err
 		}
 	} else {
-		hahandlelog.V(1).Info("Could not find a host to configure the replica.")
+		halog.V(1).Info("Could not find a host to configure the replica.")
 	}
 
 	return nil
@@ -437,7 +437,7 @@ func deleteReplicaCommand() []string {
 	return []string{"sh", "-c", command}
 }
 
-func (r *HAHandler) execCommandsInPods(
+func (r *HAManager) execCommandsInPods(
 	ctx context.Context,
 	pods []corev1.Pod,
 	config *rest.Config,
@@ -451,18 +451,18 @@ func (r *HAHandler) execCommandsInPods(
 		}
 
 		if !isRunning {
-			hahandlelog.V(1).Info("Pod is not in Running state", "Pod.Name", pod.Name)
+			halog.V(1).Info("Pod is not in Running state", "Pod.Name", pod.Name)
 			continue
 		}
 
 		isContainersRunning, err := allContainersRunning(&pod)
 		if err != nil {
-			hahandlelog.V(1).Info("container is not in Running state", "Pod.Name", pod.Name)
+			halog.V(1).Info("container is not in Running state", "Pod.Name", pod.Name)
 			continue
 		}
 
 		if !isContainersRunning {
-			hahandlelog.V(1).Info("Not all containers are in Running state, requeueing", "Pod.Name", pod.Name)
+			halog.V(1).Info("Not all containers are in Running state, requeueing", "Pod.Name", pod.Name)
 			continue
 		}
 
@@ -514,7 +514,7 @@ func execCommand(config *rest.Config, namespace, podName string, containerNames 
 	return nil
 }
 
-func (r *HAHandler) checkIfPodIsRunning(ctx context.Context, podName string, namespace string) (bool, error) {
+func (r *HAManager) checkIfPodIsRunning(ctx context.Context, podName string, namespace string) (bool, error) {
 	var pod corev1.Pod
 	err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: namespace}, &pod)
 	if err != nil {
@@ -545,7 +545,7 @@ func allContainersRunning(pod *corev1.Pod) (bool, error) {
 	return true, nil
 }
 
-func (r *HAHandler) getCubridDBPodList(
+func (r *HAManager) getCubridDBPodList(
 	ctx context.Context,
 	name string,
 	namespace string,

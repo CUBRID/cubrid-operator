@@ -24,7 +24,7 @@ const (
 	ServicePort_Name = "cubriddb-headless"
 )
 
-type ServiceHandler struct {
+type ServiceManager struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
@@ -33,14 +33,14 @@ var (
 	svclogger = log.Log.WithName("Service")
 )
 
-func NewServiceHandler(client client.Client, scheme *runtime.Scheme) *ServiceHandler {
-	return &ServiceHandler{
+func NewServiceManager(client client.Client, scheme *runtime.Scheme) *ServiceManager {
+	return &ServiceManager{
 		Client: client,
 		Scheme: scheme,
 	}
 }
 
-func (r *ServiceHandler) HandleService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
+func (r *ServiceManager) HandleService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	svcLabel := map[string]string{"app": cubridDB.Name}
 	err := r.DeleteBrokerService(ctx, cubridDB, svcLabel)
 	if err != nil {
@@ -95,7 +95,7 @@ func (r *ServiceHandler) HandleService(ctx context.Context, cubridDB *cubridv1.C
 	return nil
 }
 
-func (r *ServiceHandler) HandleHeadlessService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
+func (r *ServiceManager) HandleHeadlessService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	var existingSvc corev1.Service
 
 	ports := pkg.CreatePort(ServicePort_Name, HA_PORT, HA_PORT, corev1.ProtocolTCP, corev1.ServiceTypeClusterIP)
@@ -133,7 +133,7 @@ func (r *ServiceHandler) HandleHeadlessService(ctx context.Context, cubridDB *cu
 	return nil
 }
 
-func (r *ServiceHandler) DeleteBrokerService(
+func (r *ServiceManager) DeleteBrokerService(
 	ctx context.Context,
 	cubridDB *cubridv1.CubridDB,
 	selector map[string]string,

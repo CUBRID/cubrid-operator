@@ -21,19 +21,19 @@ import (
 // log is for logging in this package.
 var stslogger = log.Log.WithName("StatufulSet")
 
-type StatefulSetHandler struct {
+type StatefulSetManager struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-func NewStatefulSetHandler(client client.Client, scheme *runtime.Scheme) *StatefulSetHandler {
-	return &StatefulSetHandler{
+func NewStatefulSetManager(client client.Client, scheme *runtime.Scheme) *StatefulSetManager {
+	return &StatefulSetManager{
 		Client: client,
 		Scheme: scheme,
 	}
 }
 
-func (r *StatefulSetHandler) HandleStatefulSet(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
+func (r *StatefulSetManager) HandleStatefulSet(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	stslogger.V(1).Info("Handling StatefulSet for CubridDB")
 
 	var replicaNum int32 = 1
