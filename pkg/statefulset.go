@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	DEF "github.com/cubrid/cubrid-operator/pkg/define"
+	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )

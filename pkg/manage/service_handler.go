@@ -15,7 +15,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
-	DEF "github.com/cubrid/cubrid-operator/pkg/define"
+	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 )
 
 const (

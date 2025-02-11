@@ -5,7 +5,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	v1 "github.com/cubrid/cubrid-operator/api/v1"
-	DEF "github.com/cubrid/cubrid-operator/pkg/define"
+	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

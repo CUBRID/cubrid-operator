@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	DEF "github.com/cubrid/cubrid-operator/pkg/define"
+	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
