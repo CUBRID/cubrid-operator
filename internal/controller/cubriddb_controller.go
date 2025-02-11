@@ -25,7 +25,7 @@ import (
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
-	"github.com/cubrid/cubrid-operator/pkg/manage"
+	manager "github.com/cubrid/cubrid-operator/pkg/manager"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -73,7 +73,7 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("error defaulting cubriddb: %v", err)
 	}
 
-	serviceHandler := manage.NewServiceHandler(r.Client, r.Scheme)
+	serviceHandler := manager.NewServiceHandler(r.Client, r.Scheme)
 	if err := serviceHandler.HandleService(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -84,13 +84,13 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	statefulSetHandler := manage.NewStatefulSetHandler(r.Client, r.Scheme)
+	statefulSetHandler := manager.NewStatefulSetHandler(r.Client, r.Scheme)
 	if err := statefulSetHandler.HandleStatefulSet(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	if cubridDB.IsHAEnabled() {
-		HaHandler := manage.NewHAHandler(r.Client, r.Scheme, r.Config)
+		HaHandler := manager.NewHAHandler(r.Client, r.Scheme, r.Config)
 
 		result, err := HaHandler.HandleHAMode(ctx, &cubridDB, req)
 		if err != nil {
@@ -263,7 +263,7 @@ func (r *CubridDBReconciler) podDeleted(obj interface{}) {
 		}
 
 		for _, cubridDB := range cubriddbList {
-			HaHandler := manage.NewHAHandler(r.Client, r.Scheme, r.Config)
+			HaHandler := manager.NewHAHandler(r.Client, r.Scheme, r.Config)
 
 			req := reconcile.Request{
 				NamespacedName: client.ObjectKey{
