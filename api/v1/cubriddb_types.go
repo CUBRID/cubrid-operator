@@ -19,7 +19,7 @@ package v1
 import (
 	"fmt"
 
-	DEF "github.com/cubrid/cubrid-operator/pkg/define"
+	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
