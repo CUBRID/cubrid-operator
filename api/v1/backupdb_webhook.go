@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"strings"
-
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,13 +74,18 @@ func (b *BackupDB) initCburidRef() {
 	}
 }
 
-func (b *BackupDB) initCommand() {
-	sc := b.CommandArgs()
+func (b *BackupDB) initCommand() { // airnet check
+	sc := b.Schedules()
+
+	if sc.Schedule == "" {
+		sc.Schedule = DEF.BackupDB_Schedule
+	}
+
 	if sc.FilePath == "" {
 		sc.FilePath = DEF.BackupDB_Script_File_Path
 	}
 
-	if len(sc.Args) == 0 {
+	if sc.Args == "" {
 		sc.Args = DEF.BackupdbArgs
 	}
 }
@@ -97,7 +100,7 @@ func (b *BackupDB) initStroageRef() {
 
 func (b *BackupDB) initStatus() {
 	if b.Status.Command == "" {
-		b.Status.Command = strings.Join(DEF.BackupdbArgs, "")
+		b.Status.Command = DEF.BackupdbArgs // airnet check
 	}
 	backupdblog.Info("initStatus", "Command", b.Status.Command)
 
@@ -106,10 +109,12 @@ func (b *BackupDB) initStatus() {
 	}
 
 	backupdblog.Info("initStatus", "File", b.Status.FilePath)
-	if b.Status.CommandStatus == "" {
-		b.Status.CommandStatus = DEF.BackupDB_IDLE
+
+	if len(b.Status.BackupStatus) == 0 {
+		b.Status.BackupStatus = make(map[string]PodsStatus, 0)
 	}
-	backupdblog.Info("initStatus", "CommandStatus", b.Status.CommandStatus)
+
+	backupdblog.Info("initStatus", "CommandStatus", b.Status.BackupStatus)
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -123,11 +128,10 @@ func (b *BackupDB) ValidateCreate() (admission.Warnings, error) {
 
 	var allErrs field.ErrorList
 
-	command := b.Spec.CommandArgs
+	command := b.Spec.Schedules
 
-	backupdblog.Info("validate create", "schedule.Args", strings.Join(command.Args, ""))
-	if len(command.Args) != 4 {
-
+	backupdblog.Info("validate create", "schedule.Args", command.Args)
+	if command.Args == "" {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("command").Child("args"),
 			command.Args,
 			"The number of parameters passed to the backupdb script must be 4. start demodb 0 7"))
@@ -140,9 +144,9 @@ func (b *BackupDB) ValidateCreate() (admission.Warnings, error) {
 			"You must write the path to the backupdb script file."))
 	}
 
-	if b.Spec.CubridDBRef == nil || b.Spec.CubridDBRef.Name == "" {
+	if b.Spec.CubridDBRef == nil || len(b.Spec.CubridDBRef.Names) == 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cubriddbref").Child("name"),
-			b.Spec.CubridDBRef.Name,
+			b.Spec.CubridDBRef.Names,
 			"resource name may not be empty."))
 	}
 
@@ -175,21 +179,20 @@ func (b *BackupDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error
 	var allErrs field.ErrorList
 	oldBackupDB := old.(*BackupDB)
 
-	command := b.Spec.CommandArgs
+	command := b.Spec.Schedules
 
 	if command == nil {
 
 	} else {
-		if len(command.Args) != 4 {
-
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("CommandArgs").Child("args"),
-				b.Spec.CommandArgs.Args,
+		if command.Args == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("Schedules").Child("args"),
+				b.Spec.Schedules.Args,
 				"The number of parameters passed to the backupdb script must be 4. start demodb 0 7"))
 		}
 
 		if command.FilePath == "" {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("CommandArgs").Child("filepath"),
-				b.Spec.CommandArgs.FilePath,
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("Schedules").Child("filepath"),
+				b.Spec.Schedules.FilePath,
 				"You must write the path to the backupdb script file."))
 		}
 	}
@@ -204,9 +207,9 @@ func (b *BackupDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error
 				"CubridDBRef.Namespace cannot be changed."))
 		}
 
-		if b.Spec.CubridDBRef.Name == "" {
+		if len(b.Spec.CubridDBRef.Names) == 0 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cubriddbref").Child("name"),
-				b.Spec.CubridDBRef.Name,
+				b.Spec.CubridDBRef.Names,
 				"CubridDBRef.Name is required."))
 		}
 	}

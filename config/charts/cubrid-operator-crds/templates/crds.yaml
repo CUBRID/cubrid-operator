@@ -267,16 +267,20 @@ spec:
   versions:
   - additionalPrinterColumns:
     - description: Command of the BackupDB
-      jsonPath: .status.command
+      jsonPath: .spec.schedules.schedule
+      name: Schedule
+      type: string
+    - description: Command of the BackupDB
+      jsonPath: .spec.schedules.args
       name: Command
       type: string
     - description: File path for the backup script
-      jsonPath: .status.filePath
+      jsonPath: .spec.schedules.filepath
       name: File Path
       type: string
     - description: Status of the command execution
-      jsonPath: .status.commandStatus
-      name: Command Status
+      jsonPath: .status.combinedStatus
+      name: Status
       type: string
     - description: Time duration since creation of the resource
       jsonPath: .metadata.creationTimestamp
@@ -307,25 +311,24 @@ spec:
           spec:
             description: BackupDBSpec defines the desired state of BackupDB
             properties:
-              commandArgs:
-                properties:
-                  args:
-                    items:
-                      type: string
-                    type: array
-                  filepath:
-                    type: string
-                type: object
               cubridDBRef:
-                description: |-
-                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
                 properties:
                   dbName:
                     type: string
-                  name:
-                    type: string
+                  names:
+                    items:
+                      type: string
+                    type: array
                   namespace:
+                    type: string
+                type: object
+              schedules:
+                properties:
+                  args:
+                    type: string
+                  filepath:
+                    type: string
+                  schedule:
                     type: string
                 type: object
               storageRef:
@@ -337,16 +340,19 @@ spec:
           status:
             description: BackupDBStatus defines the observed state of BackupDB
             properties:
-              command:
-                description: |-
-                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
-                type: string
-              commandStatus:
-                type: string
-              filePath:
-                type: string
-              message:
+              backupStatus:
+                additionalProperties:
+                  properties:
+                    lastUpdated:
+                      format: date-time
+                      type: string
+                    message:
+                      type: string
+                    status:
+                      type: string
+                  type: object
+                type: object
+              combinedStatus:
                 type: string
             type: object
         type: object

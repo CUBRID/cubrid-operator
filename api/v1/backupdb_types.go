@@ -26,22 +26,21 @@ import (
 
 // BackupDBSpec defines the desired state of BackupDB
 type BackupDBSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 	CubridDBRef *CubridDBRef `json:"cubridDBRef,omitempty"`
-	CommandArgs *CommandArgs `json:"commandArgs,omitempty"`
+	Schedules   *Schedules   `json:"schedules,omitempty"`
 	StorageRef  *StorageRef  `json:"storageRef,omitempty"`
 }
 
 type CubridDBRef struct {
-	Namespace string `json:"namespace,omitempty"`
-	Name      string `json:"name,omitempty"`
-	DBName    string `json:"dbName,omitempty"`
+	Namespace string   `json:"namespace,omitempty"`
+	Names     []string `json:"names,omitempty"`
+	DBName    string   `json:"dbName,omitempty"` // airnet check
 }
 
-type CommandArgs struct {
-	FilePath string   `json:"filepath,omitempty"`
-	Args     []string `json:"args,omitempty"`
+type Schedules struct {
+	Schedule string `json:"schedule,omitempty"`
+	FilePath string `json:"filepath,omitempty"`
+	Args     string `json:"args,omitempty"`
 }
 
 type StorageRef struct {
@@ -50,19 +49,22 @@ type StorageRef struct {
 
 // BackupDBStatus defines the observed state of BackupDB
 type BackupDBStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	Command       string `json:"command,omitempty"`
-	FilePath      string `json:"filePath,omitempty"`
-	CommandStatus string `json:"commandStatus,omitempty"`
-	Message       string `json:"message,omitempty"`
+	BackupStatus   map[string]PodsStatus `json:"backupStatus,omitempty"`
+	CombinedStatus string                `json:"combinedStatus,omitempty"`
+}
+
+type PodsStatus struct {
+	Status      string      `json:"status,omitempty" yaml:"status"`
+	Message     string      `json:"message,omitempty" yaml:"message"`
+	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name="Command",type=string,description="Command of the BackupDB",JSONPath=".status.command"
-//+kubebuilder:printcolumn:name="File Path",type=string,description="File path for the backup script",JSONPath=".status.filePath"
-//+kubebuilder:printcolumn:name="Command Status",type=string,description="Status of the command execution",JSONPath=".status.commandStatus"
+//+kubebuilder:printcolumn:name="Schedule",type=string,description="Command of the BackupDB",JSONPath=".spec.schedules.schedule"
+//+kubebuilder:printcolumn:name="Command",type=string,description="Command of the BackupDB",JSONPath=".spec.schedules.args"
+//+kubebuilder:printcolumn:name="File Path",type=string,description="File path for the backup script",JSONPath=".spec.schedules.filepath"
+//+kubebuilder:printcolumn:name="Status",type=string,description="Status of the command execution",JSONPath=".status.combinedStatus"
 //+kubebuilder:printcolumn:name="Age",type=date,description="Time duration since creation of the resource",JSONPath=".metadata.creationTimestamp"
 
 // BackupDB is the Schema for the backupdbs API
@@ -102,33 +104,22 @@ func (b *BackupDB) StorageRef() *StorageRef {
 	return b.Spec.StorageRef
 }
 
-func (b *BackupDB) CommandArgs() *CommandArgs {
-	if b.Spec.CommandArgs == nil {
-		defaultCommand := &CommandArgs{
+func (b *BackupDB) Schedules() *Schedules {
+	if b.Spec.Schedules == nil {
+		defaultSchedules := &Schedules{
+			Schedule: "0 0 * * 0",
 			FilePath: DEF.BackupDB_Script_File_Path,
 			Args:     DEF.BackupdbArgs,
 		}
-		b.Spec.CommandArgs = defaultCommand
+		b.Spec.Schedules = defaultSchedules
 	}
 
-	return b.Spec.CommandArgs
+	return b.Spec.Schedules
 }
 
 func (b *BackupDB) BackupDBStatus() *BackupDBStatus {
-	if b.Status.Command == "" {
-		b.Status.Command = ""
-	}
-
-	if b.Status.FilePath == "" {
-		b.Status.FilePath = ""
-	}
-
-	if b.Status.CommandStatus == "" {
-		b.Status.CommandStatus = DEF.BackupDB_IDLE
-	}
-
-	if b.Status.Message == "" {
-		b.Status.Message = ""
+	if len(b.Status.BackupStatus) == 0 {
+		b.Status.BackupStatus = make(map[string]PodsStatus, 0)
 	}
 
 	return &b.Status

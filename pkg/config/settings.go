@@ -66,11 +66,10 @@ const (
 	DELETE_REPLICALINK = 1
 
 	// BackupDB
+	BackupDB_Schedule         = "0 0 * * 0"
+	BackupdbArgs              = "start demodb 0 7"
 	BackupDB_Script_File_Path = "/home/cubrid/CUBRID/share/scripts/backupdb.sh"
 	BackupDB_StorageType      = StorageType_backup
-	BackupDB_IDLE             = "Idle"
-	BackupDB_PENDING          = "Pending"
-	BackupDB_INPROGRESS       = "InProgress"
 	BackupDB_COMPLETED        = "Completed"
 	BackupDB_FAILED           = "Failed"
 
@@ -171,6 +170,4 @@ var (
 	`
 	// delete ha_copy_sync_mode
 	DelReplicaListTemplate = "sed -i '/^[#[:space:]]*ha_replica_list[[:space:]]*=.*/d' %s/conf/cubrid_ha.conf"
-
-	BackupdbArgs = []string{"start", "demodb", "0", "7"}
 )

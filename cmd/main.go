@@ -62,7 +62,6 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8180", "The address the metric endpoint binds to.")
-	//flag.StringVar(&webhookmetricsAddr, "metrics-bind-address", ":8180", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8181", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -145,11 +144,7 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if err = (&controller.BackupDBReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-			Config: mgr.GetConfig(),
-		}).SetupWithManager(mgr); err != nil {
+		if err = controller.NewBackupDBReconciler(mgr).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "BackupDB")
 			os.Exit(1)
 		}
