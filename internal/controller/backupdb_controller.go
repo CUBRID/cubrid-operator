@@ -238,7 +238,6 @@ func (r *BackupDBReconciler) triggerBackupCommandForPod(ctx context.Context, key
 
 		// Send command to the pod
 		if err := r.sendCommandToPod(ctx, podName, latestBackupDB); err != nil {
-			backupdblog.V(1).Info("==error sendCommand ==", "key", key+"/"+podName, "pod", podName, "err msg", err)
 			// Schedule a retry if the command fails
 			go r.scheduleCommandRetry(key, podName, latestBackupDB)
 		}
@@ -253,7 +252,6 @@ func (r *BackupDBReconciler) cleanupPodCommandCancelFunc(key, backupPodName stri
 
 	// Remove the cancel function for the pod
 	delete(r.backupCommandCancel, key+"/"+backupPodName)
-	fmt.Printf("%s: Done send command.\n", key+"/"+backupPodName)
 }
 
 func (r *BackupDBReconciler) scheduleCommandRetry(key string, backupPodName string, backupDB *cubridv1.BackupDB) {
@@ -266,7 +264,12 @@ func (r *BackupDBReconciler) scheduleCommandRetry(key string, backupPodName stri
 
 	// Create a context with timeout and defer cancel
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+
+	// Ensure cleanup of cancel function when exiting
+	defer func() {
+		delete(r.backupRetryCancel, key+"/"+backupPodName)
+		backupdblog.Info("Removed cancel function from backupRetryCancel", "key", key+"/"+backupPodName)
+	}()
 
 	// Store cancel function for retry
 	r.backupRetryCancel[key+"/"+backupPodName] = cancel
@@ -303,7 +306,7 @@ func (r *BackupDBReconciler) scheduleCommandRetry(key string, backupPodName stri
 
 			// Stop retrying if the max number of attempts is reached
 			if attempts >= maxAttempts {
-				backupdblog.Error(fmt.Errorf("max retry attempts reached"), "Command retry failed")
+				backupdblog.Info("max retry attempts reached")
 				return
 			}
 		}
@@ -369,7 +372,8 @@ func (r *BackupDBReconciler) checkPodState(pod *corev1.Pod, backupPodName string
 
 func (r *BackupDBReconciler) failStatus(ctx context.Context, backupPodName string, backupDB *cubridv1.BackupDB, msg string, err error) error {
 	statusMsg := fmt.Sprintf("%s: %v", msg, err)
-	return r.updateStatus(ctx, backupPodName, backupDB, DEF.BackupDB_FAILED, statusMsg)
+	r.updateStatus(ctx, backupPodName, backupDB, DEF.BackupDB_FAILED, statusMsg)
+	return err
 }
 
 func (r *BackupDBReconciler) updateBackupSchedule(ctx context.Context, req ctrl.Request, backupDB *cubridv1.BackupDB) error {
@@ -534,40 +538,43 @@ func (r *BackupDBReconciler) updateStatus(ctx context.Context, backupPod string,
 	const maxRetries = 5
 	const retryDelay = 100 * time.Millisecond
 
+	// Fetch the latest BackupDB object
+	updatedBackupDB := &cubridv1.BackupDB{}
+	err := r.Get(ctx, types.NamespacedName{Name: backupdb.Name, Namespace: backupdb.Namespace}, updatedBackupDB)
+	if err != nil {
+		backupdblog.Error(err, "Failed to fetch latest BackupDB object")
+		return err
+	}
+
+	// Initialize BackupStatus map if nil
+	if updatedBackupDB.Status.BackupStatus == nil {
+		updatedBackupDB.Status.BackupStatus = make(map[string]cubridv1.PodsStatus)
+	}
+
+	// Update pod status
+	currentTime := metav1.Time{Time: time.Now()}
+	updatedBackupDB.Status.BackupStatus[backupPod] = cubridv1.PodsStatus{
+		Status:      status,
+		Message:     strings.TrimSuffix(message, "\n"),
+		LastUpdated: currentTime,
+	}
+
+	// Calculate success count
+	completeCount := 0
+	totalPods := len(updatedBackupDB.Spec.CubridDBRef.Names)
+
+	for _, podStatus := range updatedBackupDB.Status.BackupStatus {
+		if podStatus.Status == DEF.BackupDB_COMPLETED {
+			completeCount++
+		}
+	}
+
+	// Update CombinedStatus
+	updatedBackupDB.Status.CombinedStatus = fmt.Sprintf("%d/%d", completeCount, totalPods)
+
 	for i := 0; i < maxRetries; i++ {
-		// Fetch the latest BackupDB object
-		updatedBackupDB := &cubridv1.BackupDB{}
-		err := r.Get(ctx, types.NamespacedName{Name: backupdb.Name, Namespace: backupdb.Namespace}, updatedBackupDB)
-		if err != nil {
-			backupdblog.Error(err, "Failed to fetch latest BackupDB object")
-			return err
-		}
-
-		// Initialize BackupStatus map if nil
-		if updatedBackupDB.Status.BackupStatus == nil {
-			updatedBackupDB.Status.BackupStatus = make(map[string]cubridv1.PodsStatus)
-		}
-
-		// Update pod status
-		currentTime := metav1.Time{Time: time.Now()}
-		updatedBackupDB.Status.BackupStatus[backupPod] = cubridv1.PodsStatus{
-			Status:      status,
-			Message:     strings.TrimSuffix(message, "\n"),
-			LastUpdated: currentTime,
-		}
-
-		// Calculate success count
-		completeCount := 0
-		totalPods := len(updatedBackupDB.Spec.CubridDBRef.Names)
-
-		for _, podStatus := range updatedBackupDB.Status.BackupStatus {
-			if podStatus.Status == DEF.BackupDB_COMPLETED {
-				completeCount++
-			}
-		}
-
-		// Update CombinedStatus
-		updatedBackupDB.Status.CombinedStatus = fmt.Sprintf("%d/%d", completeCount, totalPods)
+		r.Mutex.Lock()
+		defer r.Mutex.Unlock()
 
 		// Attempt to update status
 		if err := r.Status().Update(ctx, updatedBackupDB); err != nil {
@@ -586,7 +593,7 @@ func (r *BackupDBReconciler) updateStatus(ctx context.Context, backupPod string,
 	}
 
 	// If all retries failed, return an error
-	err := fmt.Errorf("failed to update BackupDB status after %d attempts", maxRetries)
+	err = fmt.Errorf("failed to update BackupDB status after %d attempts", maxRetries)
 	backupdblog.Error(err, "Giving up on status update", "Pod Name", backupdb.Name)
 	return err
 }
