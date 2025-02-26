@@ -7,15 +7,15 @@ metadata:
   name: backupdb-test
 spec:
   cubridDBRef:
-    name: cubrid-test-0
+    names: 
+      - "cubrid-master-0"
+      - "cubrid-master-1"
+      - "cubrid-master-2"
     namespace: default
     dbName: demodb
-  commandArgs:
+  schedules:
+    schedule: "46 13 * * *"
     filepath: "/share/scripts/backupdb.sh"
-    args:
-      - "start"
-      - "demodb"
-      - "0"
-      - "5"
+    args: "start demodb 0 5"
   storageRef:
     storageType: backup-storage-type

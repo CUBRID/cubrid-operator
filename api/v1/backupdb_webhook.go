@@ -99,17 +99,6 @@ func (b *BackupDB) initStroageRef() {
 }
 
 func (b *BackupDB) initStatus() {
-	if b.Status.Command == "" {
-		b.Status.Command = DEF.BackupdbArgs // airnet check
-	}
-	backupdblog.Info("initStatus", "Command", b.Status.Command)
-
-	if b.Status.FilePath == "" {
-		b.Status.FilePath = DEF.BackupDB_Script_File_Path
-	}
-
-	backupdblog.Info("initStatus", "File", b.Status.FilePath)
-
 	if len(b.Status.BackupStatus) == 0 {
 		b.Status.BackupStatus = make(map[string]PodsStatus, 0)
 	}
