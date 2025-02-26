@@ -148,12 +148,14 @@ func (r *HAManager) settingHAMasterSlave(
 		haNodeList := fmt.Sprintf("cubrid@%s", strings.Join(nodeDNSList, ":"))
 		haCopySyncMode := strings.TrimSuffix(strings.Repeat("sync:", len(nodeDNSList)), ":")
 
-		command := updateMasterSlaveCommand(haNodeList, haCopySyncMode)
-		if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
-			return err
+		commands := buildHAmodeCmds(haNodeList, haCopySyncMode)
+
+		for _, command := range commands {
+			if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
+				return err
+			}
 		}
 	} else {
-		// PodList가 0이면 haNodeList를 빈 문자열로 설정
 		halog.V(1).Info("Could not find a host to configure HA.")
 	}
 
@@ -173,7 +175,6 @@ func (r *HAManager) updateHANodeListAndSyncMode(
 	if msName != "" {
 		msPodLists, msServiceName, err := r.getCubridDBPodList(ctx, msName, namespace)
 		if err != nil {
-			halog.Error(err, "unable to fetch pods for StatefulSet")
 			return err
 		}
 
@@ -182,9 +183,12 @@ func (r *HAManager) updateHANodeListAndSyncMode(
 			msNodeList = fmt.Sprintf("cubrid@%s", strings.Join(msDNSList, ":"))
 			msCopySyncMode = strings.TrimSuffix(strings.Repeat("sync:", len(msDNSList)), ":")
 
-			command := getMSNodeListCommand(msNodeList, msCopySyncMode)
-			if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
-				return err
+			commands := buildNodeListCmds(msNodeList, msCopySyncMode)
+
+			for _, command := range commands {
+				if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
+					return err
+				}
 			}
 		} else {
 			halog.V(1).Info("No pods found")
@@ -194,13 +198,15 @@ func (r *HAManager) updateHANodeListAndSyncMode(
 	if rName != "" {
 		rList, _, err := r.getCubridDBPodList(ctx, rName, namespace)
 		if err != nil {
-			halog.Error(err, "unable to fetch pods for StatefulSet")
 			return err
 		}
 
-		command := getMSNodeListCommand(msNodeList, msCopySyncMode)
-		if err := r.execCommandsInPods(ctx, rList.Items, r.Config, namespace, command); err != nil {
-			return err
+		commands := buildNodeListCmds(msNodeList, msCopySyncMode)
+
+		for _, command := range commands {
+			if err := r.execCommandsInPods(ctx, rList.Items, r.Config, namespace, command); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -213,7 +219,7 @@ func (r *HAManager) updateHAReplicaList(
 	namespace string,
 	req ctrl.Request,
 ) error {
-	var command []string
+	var commands map[string][]string
 	var repDNSListStr []string
 	var repNodeListStr string = ""
 	var rList *corev1.PodList = &corev1.PodList{}
@@ -226,9 +232,12 @@ func (r *HAManager) updateHAReplicaList(
 		if rList != nil && len(rList.Items) > 0 {
 			repDNSListStr = CreateDNSList(rList.Items, rServiceName, req.Namespace)
 			repNodeListStr = fmt.Sprintf("cubrid@%s", strings.Join(repDNSListStr, ":"))
-			command = updateReplicaCommand(repNodeListStr)
-			if err := r.execCommandsInPods(ctx, rList.Items, r.Config, namespace, command); err != nil {
-				return err
+			commands = buildReplicaListCmds(repNodeListStr)
+
+			for _, command := range commands {
+				if err := r.execCommandsInPods(ctx, rList.Items, r.Config, namespace, command); err != nil {
+					return err
+				}
 			}
 		} else {
 			halog.Info("No pods found", "repNodeListStr", repNodeListStr)
@@ -236,20 +245,22 @@ func (r *HAManager) updateHAReplicaList(
 	}
 
 	if msCubridDBName != "" {
+		var commands = make(map[string][]string)
 		msPodLists, _, err := r.getCubridDBPodList(ctx, msCubridDBName, namespace)
 		if err != nil {
-			halog.Error(err, "unable to fetch pods for StatefulSet")
 			return err
 		}
 
 		if rList != nil && len(rList.Items) > 0 {
-			command = updateReplicaCommand(repNodeListStr)
+			commands = buildReplicaListCmds(repNodeListStr)
 		} else {
-			command = deleteReplicaCommand()
+			commands = buildReplicaDelCmds()
 		}
 
-		if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
-			return err
+		for _, command := range commands {
+			if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -263,7 +274,6 @@ func (r *HAManager) settingHAReplica(
 ) error {
 	podList, serviceName, err := r.getCubridDBPodList(ctx, statefulSetName, namespace)
 	if err != nil {
-		halog.Error(err, "unable to fetch pods for StatefulSet")
 		return err
 	}
 
@@ -271,9 +281,12 @@ func (r *HAManager) settingHAReplica(
 		nodeDNSList := CreateDNSList(podList.Items, serviceName, req.Namespace)
 		haNodeList := fmt.Sprintf("cubrid@%s", strings.Join(nodeDNSList, ":"))
 
-		command := updateHAReplicaCommand(haNodeList)
-		if err := r.execCommandsInPods(ctx, podList.Items, r.Config, namespace, command); err != nil {
-			return err
+		commands := buildReplicaCmds(haNodeList)
+
+		for _, command := range commands {
+			if err := r.execCommandsInPods(ctx, podList.Items, r.Config, namespace, command); err != nil {
+				return err
+			}
 		}
 	} else {
 		halog.V(1).Info("Could not find a host to configure the replica.")
@@ -296,145 +309,72 @@ func CreateDNSList(pods []corev1.Pod, serviceName, namespace string) []string {
 	return dnsList
 }
 
-func updateMasterSlaveCommand(haNodeList, haCopySyncMode string) []string {
+func buildHAmodeCmds(haNodeList, haCopySyncMode string) map[string][]string {
 	cubridPath := getCubridPath()
 
-	// cubrid.conf
-	haModeStr := fmt.Sprintf(
-		DEF.HaModeTemplate,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-	)
+	fullpath := cubridPath + "aa/" + DEF.HATemplateFilePath + " "
 
-	// cubrid_ha.conf
-	haCommonStr := fmt.Sprintf(
-		DEF.HaCommonConfigTemplate,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-	)
+	commands := map[string][]string{
+		"ha_mode":                      {"sh", "-c", fullpath + "ha_mode"},
+		"ha_common_config":             {"sh", "-c", fullpath + "ha_common_config"},
+		"ha_node_list":                 {"sh", "-c", fullpath + "ha_node_list" + " " + haNodeList},
+		"ha_force_remove_log_archives": {"sh", "-c", fullpath + "ha_force_remove_log_archives"},
+		"ha_copy_sync_mode":            {"sh", "-c", fullpath + "ha_copy_sync_mode" + " " + haCopySyncMode},
+		"ha_log_max_archives":          {"sh", "-c", fullpath + "ha_log_max_archives"},
+	}
 
-	haNodeListsStr := fmt.Sprintf(
-		DEF.HaNodeListTemplate,
-		cubridPath,
-		haNodeList,
-		cubridPath,
-		haNodeList,
-		cubridPath,
-	)
-
-	haSyncModeStr := fmt.Sprintf(
-		DEF.HaSyncModeTemplate,
-		cubridPath,
-		haCopySyncMode,
-		cubridPath,
-		haCopySyncMode,
-		cubridPath,
-	)
-
-	logMaxArchivesStr := fmt.Sprintf(
-		DEF.HaLogMaxArchivesTemplate,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-	)
-
-	command := haModeStr + haCommonStr + haNodeListsStr + haSyncModeStr + logMaxArchivesStr
-	return []string{"sh", "-c", command}
+	return commands
 }
 
-func updateHAReplicaCommand(haReplicaList string) []string {
+func buildReplicaCmds(haReplicaList string) map[string][]string {
 	cubridPath := getCubridPath()
 
-	// cubrid.conf
-	haModeReplicaStr := fmt.Sprintf(
-		DEF.HaReplicaModeTemplate,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-	)
+	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
 
-	// cubrid_ha.conf
-	haCommonStr := fmt.Sprintf(
-		DEF.HaCommonConfigTemplate,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-	)
+	commands := map[string][]string{
+		"ha_replica_mode":     {"sh", "-c", fullpath + "ha_replica_mode"},
+		"ha_common_config":    {"sh", "-c", fullpath + "ha_common_config"},
+		"ha_replica_list":     {"sh", "-c", fullpath + "ha_replica_list" + " " + haReplicaList},
+		"ha_log_max_archives": {"sh", "-c", fullpath + "ha_log_max_archives"},
+	}
 
-	haReplicaListStr := fmt.Sprintf(
-		DEF.HaReplicaListTemplate,
-		cubridPath,
-		haReplicaList,
-		cubridPath,
-		haReplicaList,
-		cubridPath,
-	)
-
-	logMaxArchivesStr := fmt.Sprintf(
-		DEF.HaLogMaxArchivesTemplate,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-		cubridPath,
-	)
-
-	command := haModeReplicaStr + haCommonStr + haReplicaListStr + logMaxArchivesStr
-	return []string{"sh", "-c", command}
+	return commands
 }
 
-func getMSNodeListCommand(haNodeList string, haCopySyncMode string) []string {
+func buildNodeListCmds(haNodeList string, haCopySyncMode string) map[string][]string {
 	cubridPath := getCubridPath()
 
-	haNodeListStr := fmt.Sprintf(
-		DEF.HaNodeListTemplate,
-		cubridPath, haNodeList,
-		cubridPath, haNodeList,
-		cubridPath,
-	)
+	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
 
-	haSyncModeStr := fmt.Sprintf(
-		DEF.HaSyncModeTemplate,
-		cubridPath,
-		haCopySyncMode,
-		cubridPath,
-		haCopySyncMode,
-		cubridPath,
-	)
+	commands := map[string][]string{
+		"ha_node_list":      {"sh", "-c", fullpath + "ha_node_list" + " " + haNodeList},
+		"ha_copy_sync_mode": {"sh", "-c", fullpath + "ha_copy_sync_mode" + " " + haCopySyncMode},
+	}
 
-	command := haNodeListStr + haSyncModeStr
-	return []string{"sh", "-c", command}
+	return commands
 }
 
-func updateReplicaCommand(haReplicaList string) []string {
+func buildReplicaListCmds(haReplicaList string) map[string][]string {
 	cubridPath := getCubridPath()
 
-	haReplicaListStr := fmt.Sprintf(
-		DEF.HaReplicaListTemplate,
-		cubridPath,
-		haReplicaList,
-		cubridPath,
-		haReplicaList,
-		cubridPath,
-	)
+	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
 
-	command := haReplicaListStr
-	return []string{"sh", "-c", command}
+	commands := map[string][]string{
+		"ha_replica_list": {"sh", "-c", fullpath + "ha_replica_list" + " " + haReplicaList},
+	}
+
+	return commands
 }
 
-func deleteReplicaCommand() []string {
+func buildReplicaDelCmds() map[string][]string {
 	cubridPath := getCubridPath()
 
-	haReplicaListStr := fmt.Sprintf(DEF.DelReplicaListTemplate, cubridPath)
+	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
+	commands := map[string][]string{
+		"ha_del_replica_list": {"sh", "-c", fullpath + "ha_del_replica_list"},
+	}
 
-	command := haReplicaListStr
-	return []string{"sh", "-c", command}
+	return commands
 }
 
 func (r *HAManager) execCommandsInPods(

@@ -7,6 +7,7 @@ import (
 const (
 	CubridDefaultImage        = "cubrid/cubrid:latest"
 	DefaultCUBRIDPath         = "/home/cubrid/CUBRID"
+	HATemplateFilePath        = "share/scripts/operator_conf.sh"
 	StorageType_conf          = "conf-storage-type"
 	ConfStorageVolumeName     = "conf-storage"
 	ConfMountPath             = "/home/cubrid/CUBRID/conf"
@@ -95,79 +96,4 @@ const (
 
 	POD_DNS_FULL_NAME  = "%s.%s.%s.svc.cluster.local" // <pod-name>.<headless-service-name>.<namespace>.<base-domain>
 	POD_DNS_SHORT_NAME = "%s.%s"                      // <pod-name>.<headless-service-name>
-)
-
-var (
-	/*********************************
-		 Configuration cubrid.conf
-	**********************************/
-
-	// ha_mode templete
-	HaModeTemplate = `
-		if grep -q '^[#[:space:]]*ha_mode[[:space:]]*=' %s/conf/cubrid.conf; then
-			sed -i "s/^[#[:space:]]*ha_mode[[:space:]]*=.*/ha_mode=on/" %s/conf/cubrid.conf
-		else
-			echo "ha_mode=on" >> %s/conf/cubrid.conf
-		fi
-	`
-
-	// ha_mode templete
-	HaReplicaModeTemplate = `
-		if grep -q '^[#[:space:]]*ha_mode[[:space:]]*=' %s/conf/cubrid.conf; then
-			sed -i "s/^[#[:space:]]*ha_mode[[:space:]]*=.*/ha_mode=replica/" %s/conf/cubrid.conf
-		else
-			echo "ha_mode=replica" >> %s/conf/cubrid.conf
-		fi
-	`
-
-	// log templete
-	HaLogMaxArchivesTemplate = `
-		sed -i 's/^[:space:]*log_max_archives[[:space:]]*==[[:space:]]*[0-9]*/log_max_archives=900/' %s/conf/cubrid.conf
-
-		if grep -q '^[#[:space:]]*force_remove_log_archives[[:space:]]*=' %s/conf/cubrid.conf; then
-			sed -i "s/^[#[:space:]]*force_remove_log_archives[[:space:]]*=.*/force_remove_log_archives=no/" %s/conf/cubrid.conf
-		else
-			echo "force_remove_log_archives=no" >> %s/conf/cubrid.conf
-		fi
-	`
-
-	/*********************************
-		 Configuration cubrid_ha.conf
-	**********************************/
-	// Common templete
-	HaCommonConfigTemplate = `
-		sed -i 's/^[#[:space:]]*\[\s*common\s*\]/[common]/' %s/conf/cubrid_ha.conf
-		sed -i 's/^[#[:space:]]*ha_port_id[[:space:]]*=/ha_port_id=/' %s/conf/cubrid_ha.conf
-		sed -i 's/^[#[:space:]]*ha_db_list[[:space:]]*=/ha_db_list=/' %s/conf/cubrid_ha.conf
-		sed -i 's/^[#[:space:]]*ha_apply_max_mem_size[[:space:]]*=/ha_apply_max_mem_size=/' %s/conf/cubrid_ha.conf
-		sed -i 's/^[#[:space:]]*ha_copy_log_max_archives[[:space:]]*=/ha_copy_log_max_archives=/' %s/conf/cubrid_ha.conf
-	`
-
-	// ha_node_list templete
-	HaNodeListTemplate = `
-		if grep -q '^[#[:space:]]*ha_node_list[[:space:]]*=' %s/conf/cubrid_ha.conf; then
-			sed -i "s/^[#[:space:]]*ha_node_list[[:space:]]*=.*/ha_node_list=%s/" %s/conf/cubrid_ha.conf
-		else
-			echo "ha_node_list=%s" >> %s/conf/cubrid_ha.conf
-		fi
-	`
-	// ha_copy_sync_mode templete
-	HaSyncModeTemplate = `
-		if grep -q '^[#[:space:]]*ha_copy_sync_mode[[:space:]]*=' %s/conf/cubrid_ha.conf; then
-			sed -i "s/^[#[:space:]]*ha_copy_sync_mode[[:space:]]*=.*/ha_copy_sync_mode=%s/" %s/conf/cubrid_ha.conf
-		else
-			echo "ha_copy_sync_mode=%s" >> %s/conf/cubrid_ha.conf
-		fi
-	`
-
-	// ha_replica_list templete
-	HaReplicaListTemplate = `
-		if grep -q '^[#[:space:]]*ha_replica_list[[:space:]]*=' %s/conf/cubrid_ha.conf; then
-			sed -i "s/^[#[:space:]]*ha_replica_list[[:space:]]*=.*/ha_replica_list=%s/" %s/conf/cubrid_ha.conf
-		else
-			echo "ha_replica_list=%s" >> %s/conf/cubrid_ha.conf
-		fi
-	`
-	// delete ha_copy_sync_mode
-	DelReplicaListTemplate = "sed -i '/^[#[:space:]]*ha_replica_list[[:space:]]*=.*/d' %s/conf/cubrid_ha.conf"
 )
