@@ -1,5 +1,0 @@
-## Append samples of your project ##
-resources:
-- k8s_v1_cubriddb.yaml
-- k8s_v1_backupdb.yaml
-#+kubebuilder:scaffold:manifestskustomizesamples
