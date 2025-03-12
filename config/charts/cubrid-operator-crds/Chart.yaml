@@ -4,7 +4,7 @@ description: cubrid-operator CRDs
 home: https://github.com/CUBRID/cubrid-operator
 type: application
 version: 0.0.1
-appVersion: "11.4.0"
+appVersion: "0.0.1"
 kubeVersion: ">=1.30.0-0"
 maintainers:
   - email: airnet@cubrid.com
