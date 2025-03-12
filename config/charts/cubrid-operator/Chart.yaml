@@ -3,8 +3,8 @@ name: cubrid-operator
 description: A Helm chart for Cubrid Operator
 home: https://github.com/CUBRID/cubrid-operator
 type: application
-version: 0.0.1
-appVersion: "11.4.0"
+version: 1.0.0
+appVersion: "1.0.0"
 kubeVersion: ">=1.30.0-0"
 maintainers:
   - email: airnet@cubrid.com

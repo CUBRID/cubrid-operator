@@ -24,12 +24,10 @@ add_ha_mode() {
 # Function to set the maximum number of log archives
 set_log_max_archives() {
     local VALUE=$1
-    if grep -q '^[#[:space:]]*log_max_archives[[:space:]]*=' "$CUBRID_CONF"; then
-        sed -i "s/^[#[:space:]]*log_max_archives[[:space:]]*=.*/log_max_archives=$VALUE/" "$CUBRID_CONF"
-    elif grep -q '^log_max_archives[[:space:]]*=' "$CUBRID_CONF"; then
-        sed -i "s/^log_max_archives[[:space:]]*=.*/log_max_archives=$VALUE/" "$CUBRID_CONF"
+    if grep -q '^[^#]*log_max_archives' "$CUBRID_CONF"; then
+        sed -i "s/^[^#]*log_max_archives=[^#]*/log_max_archives=$VALUE/" "$CUBRID_CONF"
     else
-        echo -e "log_max_archives=$VALUE" >> "$CUBRID_CONF"
+        echo "log_max_archives=$VALUE" >> "$CUBRID_CONF"
     fi
 }
 
@@ -119,7 +117,7 @@ set_ha_copy_sync_mode() {
     elif grep -q '^ha_copy_sync_mode[[:space:]]*=' "$CUBRID_HA_CONF"; then
         sed -i "s/^[[:space:]]*ha_copy_sync_mode[[:space:]]*=.*/ha_copy_sync_mode=$MODE/" "$CUBRID_HA_CONF"
     else
-        echo -e "ha_node_list=$MODE" >> "$CUBRID_HA_CONF"
+        echo -e "ha_copy_sync_mode=$MODE" >> "$CUBRID_HA_CONF"
     fi
 }
 

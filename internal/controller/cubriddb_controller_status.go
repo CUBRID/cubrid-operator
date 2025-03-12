@@ -73,7 +73,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 
 			status, errCode := r.isResponseStatus(responseMap)
 			if errCode != nil {
-				fmt.Printf("=====>>> %v", errCode)
+				fmt.Printf("%v\n", errCode)
 				continue
 			}
 
@@ -220,7 +220,7 @@ func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string
 	defer func() {
 		if resp != nil && resp.Body != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("error closing response body: %v", err)
+				fmt.Printf("error closing response body: %v\n", err)
 			}
 		}
 	}()

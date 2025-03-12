@@ -21,6 +21,7 @@ import (
 
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,13 +35,14 @@ type CubridDBSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Replication    *Replication                      `json:"replication,omitempty"`
-	Affinity       *Affinity                         `json:"affinty,omitempty"`
-	Broker         []Broker                          `json:"broker,omitempty"`
-	Image          string                            `json:"image,omitempty"`
-	Storage        []Storage                         `json:"storage,omitempty"`
-	Label          string                            `json:"label,omitempty"`
-	UpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	Replication     *Replication                      `json:"replication,omitempty"`
+	Affinity        *Affinity                         `json:"affinty,omitempty"`
+	Broker          []Broker                          `json:"broker,omitempty"`
+	Image           string                            `json:"image,omitempty"`
+	Storage         []Storage                         `json:"storage,omitempty"`
+	Label           string                            `json:"label,omitempty"`
+	UpdateStrategy  *appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	ImagePullPolicy corev1.PullPolicy                 `json:"imagePullPolicy,omitempty"`
 }
 
 // CubridDBStatus defines the observed state of CubridDB
