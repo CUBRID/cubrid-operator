@@ -74,11 +74,19 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
+
+	// Create Broker Service
 	if err := serviceManager.HandleService(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, err
 	}
 
+	// Create CMS Service
+	if err := serviceManager.HandleCMSService(ctx, &cubridDB); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if cubridDB.IsHAEnabled() {
+		// Create Headless Service
 		if err := serviceManager.HandleHeadlessService(ctx, &cubridDB); err != nil {
 			return ctrl.Result{}, err
 		}

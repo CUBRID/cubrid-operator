@@ -57,11 +57,18 @@ const (
 
 	// Service
 	SVC_NAME_SUFFIX          = "-int"
+	SVC_CMS_SUFFIX           = "-cms-svc"
+	SVC_CMS_SVC_PORT         = 31011
+	SVC_CMS_PORT             = 8001
 	SVC_TYPE_NODE_PORT       = string(corev1.ServiceTypeClusterIP)
 	SVC_TYPE_CLUSTER_IP      = string(corev1.ServiceTypeClusterIP)
 	SVC_PORT_SUFFIX          = "-port"
 	SVC_BR_NAME_QUERY_EDITOR = "cubrid-query-editor"
 	SVC_BR_NAME_BROKER1      = "cubrid-broker1"
+	SVC_HA_PORT              = 59901
+	SVC_HEADLESS_DNS         = "%s.%s"
+	SVC_HEADLESS_PORT_NAME   = "cubriddb-headless"
+	SVC_CMS_PORT_NAME        = "cubrid-cms-port"
 
 	ADD_REPLICALINK    = 0
 	DELETE_REPLICALINK = 1
@@ -85,8 +92,8 @@ const (
 
 	// Cubrid Manager
 	CMS_HTTPS_URL = "https://%s:%d/cm_api"
-	CMS_ID        = "testcm"
-	CMS_PW        = "testpwd"
+	CMS_ID        = "cm_info"
+	CMS_PW        = "cm_inf0pw"
 	CMS_PORT      = 8001
 	CMS_VERSION   = "11.4"
 

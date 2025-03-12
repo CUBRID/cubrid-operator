@@ -18,12 +18,6 @@ import (
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 )
 
-const (
-	HA_PORT          = 59901
-	HEADLESS_DNS     = "%s.%s"
-	ServicePort_Name = "cubriddb-headless"
-)
-
 type ServiceManager struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -40,6 +34,43 @@ func NewServiceManager(client client.Client, scheme *runtime.Scheme) *ServiceMan
 	}
 }
 
+func (r *ServiceManager) HandleCMSService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
+	var existingSvc corev1.Service
+
+	ports := pkg.CreatePort(DEF.SVC_CMS_PORT_NAME, DEF.SVC_CMS_SVC_PORT, DEF.SVC_CMS_PORT, corev1.ProtocolTCP, corev1.ServiceTypeNodePort)
+	cms_svc := pkg.CreateService(
+		cubridDB.Name+DEF.SVC_CMS_SUFFIX,
+		cubridDB.Namespace,
+		cubridDB.Name,
+		corev1.ServiceTypeNodePort,
+		ports,
+	)
+
+	if err := controllerutil.SetControllerReference(cubridDB, cms_svc, r.Scheme); err != nil {
+		return fmt.Errorf("error setting controller reference to headless service : %v", err)
+	}
+
+	err := r.Get(ctx, types.NamespacedName{Name: cms_svc.Name, Namespace: cms_svc.Namespace}, &existingSvc)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			if createErr := r.Create(ctx, cms_svc); createErr != nil {
+				return fmt.Errorf("error creating Service %s/%s: %v", cms_svc.Namespace, cms_svc.Name, createErr)
+			}
+			return nil
+		}
+		return fmt.Errorf("error getting headless service %s/%s: %v", cms_svc.Namespace, cms_svc.Name, err)
+	}
+
+	patch := client.MergeFrom(existingSvc.DeepCopy())
+	existingSvc.Spec = cms_svc.Spec
+
+	if err := r.Patch(ctx, &existingSvc, patch); err != nil {
+		return fmt.Errorf("error patching headless service %s/%s: %v", existingSvc.Namespace, existingSvc.Name, err)
+	}
+
+	return nil
+}
+
 func (r *ServiceManager) HandleService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	svcLabel := map[string]string{"app": cubridDB.Name}
 	err := r.DeleteBrokerService(ctx, cubridDB, svcLabel)
@@ -50,6 +81,7 @@ func (r *ServiceManager) HandleService(ctx context.Context, cubridDB *cubridv1.C
 		)
 	}
 
+	// Create Broker Service
 	for _, bs := range cubridDB.Spec.Broker {
 		ports := pkg.CreatePort(
 			bs.Name+DEF.SVC_PORT_SUFFIX,
@@ -98,7 +130,7 @@ func (r *ServiceManager) HandleService(ctx context.Context, cubridDB *cubridv1.C
 func (r *ServiceManager) HandleHeadlessService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	var existingSvc corev1.Service
 
-	ports := pkg.CreatePort(ServicePort_Name, HA_PORT, HA_PORT, corev1.ProtocolTCP, corev1.ServiceTypeClusterIP)
+	ports := pkg.CreatePort(DEF.SVC_HEADLESS_PORT_NAME, DEF.SVC_HA_PORT, DEF.SVC_HA_PORT, corev1.ProtocolTCP, corev1.ServiceTypeClusterIP)
 	headlessService := pkg.CreateService(
 		cubridDB.Name+DEF.SVC_NAME_SUFFIX,
 		cubridDB.Namespace,

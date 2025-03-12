@@ -312,7 +312,7 @@ func CreateDNSList(pods []corev1.Pod, serviceName, namespace string) []string {
 func buildHAmodeCmds(haNodeList, haCopySyncMode string) map[string][]string {
 	cubridPath := getCubridPath()
 
-	fullpath := cubridPath + "aa/" + DEF.HATemplateFilePath + " "
+	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
 
 	commands := map[string][]string{
 		"ha_mode":                      {"sh", "-c", fullpath + "ha_mode"},
