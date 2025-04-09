@@ -38,6 +38,7 @@ type CubridDBSpec struct {
 	Replication     *Replication                      `json:"replication,omitempty"`
 	Affinity        *Affinity                         `json:"affinty,omitempty"`
 	Broker          []Broker                          `json:"broker,omitempty"`
+	CMSService      *CMSServiceConfig                 `json:"cmsService,omitempty"`
 	Image           string                            `json:"image,omitempty"`
 	Storage         []Storage                         `json:"storage,omitempty"`
 	Label           string                            `json:"label,omitempty"`
@@ -93,10 +94,30 @@ type Affinity struct {
 }
 
 type Broker struct {
-	Name        string `json:"name"`
-	Port        int32  `json:"port,omitempty"`
-	ServicePort int32  `json:"servicePort,omitempty"`
-	ServiceType string `json:"serviceType,omitempty"`
+	// Name is the unique identifier for the broker
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Port is the broker port number
+	Port int32 `json:"port,omitempty"`
+
+	// ServiceType determines how the Service is exposed
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort
+	ServiceType corev1.ServiceType `json:"serviceType"`
+
+	// ServicePort is the port number that will be exposed when ServiceType is NodePort
+	// +optional
+	ServicePort int32 `json:"servicePort,omitempty"`
+}
+
+// CMSServiceConfig defines the configuration for CMS services
+type CMSServiceConfig struct {
+	// Enabled indicates whether CMS service should be created
+	Enabled *bool `json:"enabled,omitempty"`
+	// StartPort is the starting NodePort number for CMS services
+	StartPort *int32 `json:"startPort,omitempty"`
+	// Port is the container port number for CMS
+	Port *int32 `json:"port,omitempty"`
 }
 
 type Storage struct {
@@ -129,6 +150,7 @@ func (c *CubridDB) SetDefaults() {
 	c.InitStorages()
 	c.InitAffinity()
 	c.InitUpdateStrategy()
+	c.InitCMSService()
 }
 
 func (c *CubridDB) Replication() Replication {
@@ -207,16 +229,16 @@ func (c *CubridDB) InitBroker() {
 	if len(c.Spec.Broker) == 0 {
 		broker1 := Broker{
 			Name:        DEF.SVC_BR_NAME_QUERY_EDITOR,
-			Port:        30000,
+			Port:        int32(30000),
 			ServiceType: DEF.SVC_TYPE_NODE_PORT,
-			ServicePort: 30000,
+			ServicePort: int32(30000),
 		}
 
 		broker2 := Broker{
 			Name:        DEF.SVC_BR_NAME_BROKER1,
-			Port:        33000,
+			Port:        int32(33000),
 			ServiceType: DEF.SVC_TYPE_NODE_PORT,
-			ServicePort: 31000,
+			ServicePort: int32(31000),
 		}
 
 		c.Spec.Broker = []Broker{broker1, broker2}
@@ -289,4 +311,50 @@ func (c *CubridDB) InitUpdateStrategy() {
 			Type: appsv1.RollingUpdateStatefulSetStrategyType,
 		}
 	}
+}
+
+// setCMSServiceDefaults sets defaults for CMS service configuration
+func (c *CubridDB) InitCMSService() {
+	if c.Spec.CMSService == nil {
+		c.Spec.CMSService = &CMSServiceConfig{}
+	}
+
+	if c.Spec.CMSService.Enabled == nil {
+		enabled := DEF.SVC_CMS_ENABLED
+		c.Spec.CMSService.Enabled = &enabled
+	}
+
+	if c.Spec.CMSService.StartPort == nil {
+		startPort := int32(DEF.SVC_CMS_START_NODE_PORT)
+		c.Spec.CMSService.StartPort = &startPort
+	}
+
+	if c.Spec.CMSService.Port == nil {
+		port := int32(DEF.SVC_CMS_PORT)
+		c.Spec.CMSService.Port = &port
+	}
+}
+
+// GetCMSPort returns the CMS port number
+func (c *CubridDB) GetCMSPort() int32 {
+	if c.Spec.CMSService == nil || c.Spec.CMSService.Port == nil {
+		return DEF.SVC_CMS_PORT
+	}
+	return *c.Spec.CMSService.Port
+}
+
+// GetCMSStartPort returns the CMS start port number
+func (c *CubridDB) GetCMSStartPort() int32 {
+	if c.Spec.CMSService == nil || c.Spec.CMSService.StartPort == nil {
+		return DEF.SVC_CMS_START_NODE_PORT
+	}
+	return *c.Spec.CMSService.StartPort
+}
+
+// IsCMSEnabled returns whether CMS service is enabled
+func (c *CubridDB) IsCMSEnabled() bool {
+	if c.Spec.CMSService == nil || c.Spec.CMSService.Enabled == nil {
+		return DEF.SVC_CMS_ENABLED
+	}
+	return *c.Spec.CMSService.Enabled
 }

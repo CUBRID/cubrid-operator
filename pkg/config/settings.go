@@ -55,13 +55,14 @@ const (
 
 	SELECTOR_SUFFIX = "-group"
 
-	// Service
-	SVC_NAME_SUFFIX          = "-int"
+	// CMS Service
+	SVC_NAME_SUFFIX          = "headless"
 	SVC_CMS_SUFFIX           = "-cms-svc"
-	SVC_CMS_SVC_PORT         = 31011
+	SVC_CMS_START_NODE_PORT  = 31000
 	SVC_CMS_PORT             = 8001
-	SVC_TYPE_NODE_PORT       = string(corev1.ServiceTypeClusterIP)
-	SVC_TYPE_CLUSTER_IP      = string(corev1.ServiceTypeClusterIP)
+	SVC_CMS_ENABLED          = true
+	SVC_TYPE_NODE_PORT       = (corev1.ServiceTypeClusterIP)
+	SVC_TYPE_CLUSTER_IP      = (corev1.ServiceTypeClusterIP)
 	SVC_PORT_SUFFIX          = "-port"
 	SVC_BR_NAME_QUERY_EDITOR = "cubrid-query-editor"
 	SVC_BR_NAME_BROKER1      = "cubrid-broker1"
@@ -90,7 +91,7 @@ const (
 	HAMODE_REPLICA    = "Replica"
 	HAMODE_UNKONW     = "Unkonw"
 
-	// Cubrid Manager
+	// Cubrid Manager Server
 	CMS_HTTPS_URL = "https://%s:%d/cm_api"
 	CMS_ID        = "cm_info"
 	CMS_PW        = "cm_inf0pw"

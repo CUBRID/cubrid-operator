@@ -1,7 +1,7 @@
 apiVersion: k8s.cubrid.com/v1
 kind: CubridDB
 metadata:
-  name: cubrid-master
+  name: ha-ms
 
 spec:
   image: airnet73/cubrid:v11.3.2.1187
@@ -24,8 +24,4 @@ spec:
   - name: ms-broker2-svc
     port: 33000
     servicePort: 30300
-    serviceType: NodePort
-  - name: ms-broker3-svc
-    port: 33300
-    servicePort: 30330
     serviceType: NodePort

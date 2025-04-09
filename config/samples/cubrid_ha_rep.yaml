@@ -1,7 +1,7 @@
 apiVersion: k8s.cubrid.com/v1
 kind: CubridDB
 metadata:
-  name: cubrid-replica
+  name: ha-rep
 
 spec:
   image: airnet73/cubrid:v11.3.2.1187
@@ -16,20 +16,17 @@ spec:
     hamodeType:
       type: "replica"
       cubridRef:
-        name: "cubrid-master"
-  
+        name: "ha-ms"
+  cmsService:
+    enabled: true
+    startPort: 31190
+    port: 8001
   broker:
-  - appl_max: 40
-    appl_min: 5
-    brokerType: RW
-    name: rep-broker1-svc
+  - name: rep-broker1-svc
     port: 30000
     servicePort: 30100
     serviceType: NodePort
-  - appl_max: 40
-    appl_min: 5
-    brokerType: RW
-    name: rep-broker2-svc
+  - name: rep-broker2-svc
     port: 33000
     servicePort: 30101
     serviceType: NodePort

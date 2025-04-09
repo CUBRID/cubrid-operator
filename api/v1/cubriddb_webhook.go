@@ -57,6 +57,7 @@ func (c *CubridDB) Default() {
 		c.initStorages,
 		c.initAffinity,
 		c.initUpdateStrategy,
+		c.initCMSService,
 	}
 
 	for _, fn := range defaultFns {
@@ -75,6 +76,7 @@ func (c *CubridDB) ValidateCreate() (admission.Warnings, error) {
 	validateFns := []func() error{
 		c.validateHA,
 		c.validateCubridDBByRefName,
+		c.validateCMSService,
 	}
 
 	for _, fn := range validateFns {
@@ -270,6 +272,44 @@ func (c *CubridDB) validateCubridDBByRefName() error {
 	return nil
 }
 
+func (c *CubridDB) validateCMSService() error {
+	cubriddblog.Info("validateCMSService", "name", c.Name)
+
+	var allErrs field.ErrorList
+
+	if c.Spec.CMSService != nil && c.Spec.CMSService.Enabled != nil && *c.Spec.CMSService.Enabled {
+		if c.Spec.CMSService.StartPort != nil {
+			if *c.Spec.CMSService.StartPort < 30000 || *c.Spec.CMSService.StartPort > 32767 {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "cmsService", "startPort"),
+					*c.Spec.CMSService.StartPort,
+					"startPort must be between 30000 and 32767 (NodePort range)",
+				))
+			}
+		}
+
+		if c.Spec.CMSService.Port != nil {
+			if *c.Spec.CMSService.Port < 1 || *c.Spec.CMSService.Port > 65535 {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "cmsService", "port"),
+					*c.Spec.CMSService.Port,
+					"port must be between 1 and 65535",
+				))
+			}
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+
+	return apierrors.NewInvalid(
+		schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"},
+		c.Name,
+		allErrs,
+	)
+}
+
 func (c *CubridDB) initImage() {
 	c.InitImage()
 }
@@ -292,4 +332,8 @@ func (c *CubridDB) initAffinity() {
 
 func (c *CubridDB) initUpdateStrategy() {
 	c.InitUpdateStrategy()
+}
+
+func (c *CubridDB) initCMSService() {
+	c.InitCMSService()
 }

@@ -1,91 +1,127 @@
 package pkg
 
 import (
-	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
+	"fmt"
+
+	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func CreateService(
-	svcName string,
-	svcNamespace string,
-	svcSelector string,
-	svcType corev1.ServiceType,
-	ports []corev1.ServicePort) *corev1.Service {
+// Service type constants
+const (
+	ServiceTypeHeadless = "headless"
+)
 
-	label := map[string]string{"app": svcSelector}
+type ServiceType string
 
-	return &corev1.Service{
-		ObjectMeta: NewObjectMeta(svcName, svcNamespace, label, label),
-		Spec:       CreateServiceSpec(svcSelector, svcType, ports),
+const (
+	ServiceTypeCMS    ServiceType = "cms"
+	ServiceTypeBroker ServiceType = "broker"
+)
+
+// CreateServiceMeta creates ObjectMeta for a service
+func CreateServiceMeta(name, namespace string, labels map[string]string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      name,
+		Namespace: namespace,
+		Labels:    labels,
 	}
 }
 
-func CreateServiceSpec(svcSelector string, svcType corev1.ServiceType, ports []corev1.ServicePort) corev1.ServiceSpec {
-	return corev1.ServiceSpec{
-		Type:     svcType,
-		Selector: map[string]string{"app": svcSelector},
-		Ports:    ports,
-	}
-}
-
-// Setting up one port in SVC
-func CreatePort(
-	name string,
-	servicePort int32,
-	targetPort int32,
-	protocol corev1.Protocol,
-	serviceType corev1.ServiceType) []corev1.ServicePort {
-
-	ports := []corev1.ServicePort{
-		buildServicePort(name, servicePort, targetPort, protocol),
-	}
-
-	if serviceType == corev1.ServiceTypeNodePort {
-		buildNodePort(&ports[0], servicePort)
-	}
-
-	return ports
-}
-
-// Setting up multiple ports in SVC
-func CreateNodePorts(cubridDB *cubridv1.CubridDB) []corev1.ServicePort {
-	servicePorts := make([]corev1.ServicePort, 0, len(cubridDB.Spec.Broker))
-
-	for _, svc := range cubridDB.Spec.Broker {
-		servicePorts = append(servicePorts, corev1.ServicePort{
-			Name:       svc.Name,
-			Protocol:   corev1.ProtocolTCP,
-			Port:       svc.ServicePort,
-			TargetPort: intstr.FromInt32(svc.Port),
-			NodePort:   svc.ServicePort,
-		})
-	}
-
-	return servicePorts
-}
-
-func buildServicePort(name string, servicePort int32, targetPort int32, protocol corev1.Protocol) corev1.ServicePort {
+// CreateServicePort creates a ServicePort configuration
+func CreateServicePort(name string, port, targetPort, nodePort int32, protocol corev1.Protocol) corev1.ServicePort {
 	return corev1.ServicePort{
 		Name:       name,
 		Protocol:   protocol,
-		Port:       servicePort,
+		Port:       port,
 		TargetPort: intstr.FromInt32(targetPort),
+		NodePort:   nodePort,
 	}
 }
 
-func buildNodePort(servicePort *corev1.ServicePort, nodePort int32) {
-	servicePort.NodePort = nodePort
+// CreateServiceSpec creates a ServiceSpec configuration
+func CreateServiceSpec(serviceType corev1.ServiceType, ports []corev1.ServicePort, selector map[string]string) corev1.ServiceSpec {
+	return corev1.ServiceSpec{
+		Type:     serviceType,
+		Ports:    ports,
+		Selector: selector,
+	}
 }
 
-func GetServiceType(svcType string) string {
-	var serviceType string
-	if svcType == "ClusterIP" {
-		serviceType = string(corev1.ServiceTypeClusterIP)
-	} else if svcType == "NodePort" {
-		serviceType = string(corev1.ServiceTypeNodePort)
-	} else {
-		serviceType = "None"
+// CreateCMSSelector creates a selector for CMS service
+func CreateCMSSelector(podName string) map[string]string {
+	return map[string]string{
+		"statefulset.kubernetes.io/pod-name": podName,
 	}
-	return serviceType
+}
+
+// CreateBrokerSelector creates a selector for Broker service
+func CreateBrokerSelector(appName string) map[string]string {
+	return map[string]string{
+		"app": appName,
+	}
+}
+
+// CreateServiceLabels creates labels for a service
+func CreateServiceLabels(appName string, serviceType ServiceType, additionalLabels map[string]string) map[string]string {
+	labels := map[string]string{
+		"app":     appName,
+		"service": string(serviceType),
+	}
+	for k, v := range additionalLabels {
+		labels[k] = v
+	}
+	return labels
+}
+
+// ValidateNodePortRange validates the NodePort range
+func ValidateNodePortRange(startPort int32, count int32) error {
+	if startPort < 30000 || startPort > 32767 {
+		return fmt.Errorf("start port must be between 30000 and 32767")
+	}
+	endPort := startPort + count - 1
+	if endPort > 32767 {
+		return fmt.Errorf("port range exceeds maximum NodePort value (32767)")
+	}
+	return nil
+}
+
+// CreateHeadlessServicePort creates a service port for headless service
+func CreateHeadlessServicePort(name string, port int32, targetPort int32, protocol corev1.Protocol) corev1.ServicePort {
+	return corev1.ServicePort{
+		Name:       name,
+		Port:       port,
+		TargetPort: intstr.FromInt32(targetPort),
+		Protocol:   protocol,
+	}
+}
+
+// CreateHeadlessServiceSelector creates a selector for headless service
+func CreateHeadlessServiceSelector(cubridDBName string) map[string]string {
+	return map[string]string{
+		// "app.kubernetes.io/name":     "cubrid",
+		"app": cubridDBName,
+	}
+}
+
+// CreateHeadlessService creates a headless service for StatefulSet
+func CreateHeadlessService(cubridDBName string, namespace string, ports []corev1.ServicePort) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: CreateServiceMeta(
+			CreateHeadlessServiceName(cubridDBName),
+			namespace,
+			CreateServiceLabels(cubridDBName, ServiceTypeHeadless, nil),
+		),
+		Spec: corev1.ServiceSpec{
+			ClusterIP: "None", // Headless service
+			Ports:     ports,
+			Selector:  CreateHeadlessServiceSelector(cubridDBName),
+		},
+	}
+}
+
+func CreateHeadlessServiceName(cubridDBName string) string {
+	return fmt.Sprintf("%s-%s", cubridDBName, DEF.SVC_NAME_SUFFIX)
 }

@@ -184,7 +184,6 @@ var webhookCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// 스키마에 CubridDB 타입 추가
 		if err := cubridv1.AddToScheme(mgr.GetScheme()); err != nil {
 			fmt.Println("Unable to add CubridDB to scheme:", err)
 			os.Exit(1)

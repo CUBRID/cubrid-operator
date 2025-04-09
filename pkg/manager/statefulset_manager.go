@@ -33,11 +33,11 @@ func NewStatefulSetManager(client client.Client, scheme *runtime.Scheme) *Statef
 	}
 }
 
-func (r *StatefulSetManager) HandleStatefulSet(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
+func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	stslogger.V(1).Info("Handling StatefulSet for CubridDB")
 
 	var replicaNum int32 = 1
-	var serviceName string = cubridDB.Name + DEF.SVC_NAME_SUFFIX
+	serviceName := pkg.CreateHeadlessServiceName(cubridDB.Name)
 
 	if cubridDB.Spec.Replication.Enable {
 		replicaNum = cubridDB.Spec.Replication.Replicas

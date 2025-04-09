@@ -58,19 +58,44 @@ spec:
                 items:
                   properties:
                     name:
+                      description: Name is the unique identifier for the broker
                       type: string
                     port:
+                      description: Port is the broker port number
                       format: int32
                       type: integer
                     servicePort:
+                      description: ServicePort is the port number that will be exposed
+                        when ServiceType is NodePort
                       format: int32
                       type: integer
                     serviceType:
+                      description: ServiceType determines how the Service is exposed
+                      enum:
+                      - ClusterIP
+                      - NodePort
                       type: string
                   required:
                   - name
+                  - serviceType
                   type: object
                 type: array
+              cmsService:
+                description: CMSServiceConfig defines the configuration for CMS services
+                properties:
+                  enabled:
+                    description: Enabled indicates whether CMS service should be created
+                    type: boolean
+                  port:
+                    description: Port is the container port number for CMS
+                    format: int32
+                    type: integer
+                  startPort:
+                    description: StartPort is the starting NodePort number for CMS
+                      services
+                    format: int32
+                    type: integer
+                type: object
               image:
                 type: string
               imagePullPolicy:

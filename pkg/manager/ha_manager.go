@@ -39,7 +39,7 @@ func NewHAManager(client client.Client, scheme *runtime.Scheme, config *rest.Con
 	}
 }
 
-func (r *HAManager) HandleHAMode(
+func (r *HAManager) ReconcileHAMode(
 	ctx context.Context,
 	cubridDB *cubridv1.CubridDB,
 	req ctrl.Request,

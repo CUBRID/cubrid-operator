@@ -73,7 +73,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 
 			status, errCode := r.isResponseStatus(responseMap)
 			if errCode != nil {
-				fmt.Printf("%v\n", errCode)
+				cubriddblog.Error(errCode, "Error checking response status")
 				continue
 			}
 
@@ -168,7 +168,7 @@ func parseHANodesStatus(responseMap map[string]interface{}) (map[string]string, 
 			stateKey := fmt.Sprintf("%s_state", key)
 			state, ok := responseMap[stateKey].(string)
 			if !ok {
-				fmt.Printf("State key %s not found for node %s\n", stateKey, node)
+				cubriddblog.V(2).Info("State key not found for node", "stateKey", stateKey, "node", node)
 				continue
 			}
 			repCase := cases.Title(language.English)
@@ -220,7 +220,7 @@ func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string
 	defer func() {
 		if resp != nil && resp.Body != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("error closing response body: %v\n", err)
+				cubriddblog.Error(err, "Error closing response body")
 			}
 		}
 	}()
@@ -261,7 +261,7 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 	defer func() {
 		if resp != nil && resp.Body != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("error closing response body: %v", err)
+				cubriddblog.Error(err, "Error closing response body")
 			}
 		}
 	}()
@@ -283,34 +283,15 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 	return responseMap, nil
 }
 
-func createLoginCommand(id, password, clientver string) *pkg.Command {
-	command := &pkg.Command{
-		Task: DEF.CMS_CMD_LOGIN,
-		Extra: map[string]interface{}{
-			"id":        id,
-			"password":  password,
-			"clientver": clientver,
-		},
-	}
-
-	jsonData, _ := json.Marshal(command)
-	fmt.Println("command: ", string(jsonData))
-
-	return command
+func createLoginCommand(id, password, clientver string) *pkg.CMSCommand {
+	return pkg.CreateLoginCommand(id, password, clientver)
 }
 
-func createStatusCommand(token string) (*pkg.Command, error) {
+func createStatusCommand(token string) (*pkg.CMSCommand, error) {
 	if token == "" {
 		return nil, fmt.Errorf("invalid empty token")
 	}
-
-	extra := map[string]interface{}{
-		"token": token,
-	}
-
-	// 상태 명령어 생성
-	builder := pkg.NewCommandBuilder(token)
-	return builder.CreateCommand(DEF.CMS_CMD_HA_STATUS, extra)
+	return pkg.CreateHAStatusCommand(token), nil
 }
 
 func (r *CubridDBReconciler) getCredentialsFromSecret(ctx context.Context, secretName, namespace string) (string, string, string, error) {

@@ -73,34 +73,23 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("error defaulting cubriddb: %v", err)
 	}
 
+	// Create service manager
 	serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
 
-	// Create Broker Service
-	if err := serviceManager.HandleService(ctx, &cubridDB); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Create CMS Service
-	if err := serviceManager.HandleCMSService(ctx, &cubridDB); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if cubridDB.IsHAEnabled() {
-		// Create Headless Service
-		if err := serviceManager.HandleHeadlessService(ctx, &cubridDB); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
 	statefulSetHandler := manager.NewStatefulSetManager(r.Client, r.Scheme)
-	if err := statefulSetHandler.HandleStatefulSet(ctx, &cubridDB); err != nil {
+	if err := statefulSetHandler.ReconcileStatefulSet(ctx, &cubridDB); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Reconcile all services
+	if err := serviceManager.ReconcileServices(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	if cubridDB.IsHAEnabled() {
 		haManager := manager.NewHAManager(r.Client, r.Scheme, r.Config)
 
-		result, err := haManager.HandleHAMode(ctx, &cubridDB, req)
+		result, err := haManager.ReconcileHAMode(ctx, &cubridDB, req)
 		if err != nil {
 			return result, err
 		}
@@ -280,7 +269,7 @@ func (r *CubridDBReconciler) podDeleted(obj interface{}) {
 				},
 			}
 
-			_, err := haManager.HandleHAMode(context.Background(), &cubridDB, req)
+			_, err := haManager.ReconcileHAMode(context.Background(), &cubridDB, req)
 			if err != nil {
 				cubriddblog.V(1).Info(fmt.Sprintf("Failed HAMode reconfiguration : %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
 			}
