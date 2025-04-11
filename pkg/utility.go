@@ -208,6 +208,7 @@ func GetCubridDBPodList(
 }
 
 func UpdateCubridDB(ctx context.Context, c client.Client, pod *corev1.Pod) error {
+	// Find StatefulSet from Pod's OwnerReferences
 	var statefulSetName string
 	for _, ownerRef := range pod.OwnerReferences {
 		if ownerRef.Kind == "StatefulSet" {
@@ -221,11 +222,13 @@ func UpdateCubridDB(ctx context.Context, c client.Client, pod *corev1.Pod) error
 		return fmt.Errorf("no StatefulSet owner found for Pod %s", pod.Name)
 	}
 
+	// Get StatefulSet
 	var statefulSet appsv1.StatefulSet
 	if err := c.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: statefulSetName}, &statefulSet); err != nil {
 		return fmt.Errorf("failed to get StatefulSet %s: %v", statefulSetName, err)
 	}
 
+	// 3. Find CubridDB from StatefulSet's OwnerReferences
 	var cubridDBName string
 	for _, ownerRef := range statefulSet.OwnerReferences {
 		if ownerRef.Kind == "CubridDB" {
@@ -238,16 +241,16 @@ func UpdateCubridDB(ctx context.Context, c client.Client, pod *corev1.Pod) error
 		return fmt.Errorf("no CubridDB owner found for StatefulSet %s", statefulSetName)
 	}
 
+	// Get CubridDB
 	var cubridDB cubridv1.CubridDB
 	if err := c.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: cubridDBName}, &cubridDB); err != nil {
 		return fmt.Errorf("failed to get CubridDB %s: %v", cubridDBName, err)
 	}
 
-	// StatefulSet의 replicas 값을 CR에 반영합니다.
+	// Update the replicas value in the CR with the StatefulSet's replicas
 	if *statefulSet.Spec.Replicas != cubridDB.Spec.Replication.Replicas {
 		cubridDB.Spec.Replication.Replicas = *statefulSet.Spec.Replicas
 
-		// CR 업데이트
 		if err := c.Update(ctx, &cubridDB); err != nil {
 			return fmt.Errorf("unable to update CubridDB: %v", err)
 		}

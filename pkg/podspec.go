@@ -59,18 +59,20 @@ func CreatePodTemplateSpec(
 	containers []corev1.Container,
 	securityContext *corev1.PodSecurityContext,
 	volumes []corev1.Volume,
-	affinity *corev1.Affinity) corev1.PodTemplateSpec {
+	affinity *corev1.Affinity,
+	serviceAccountName string) corev1.PodTemplateSpec {
 
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
 		},
 		Spec: corev1.PodSpec{
-			InitContainers:  initContainers,
-			Containers:      containers,
-			SecurityContext: securityContext,
-			Volumes:         volumes,
-			Affinity:        affinity,
+			InitContainers:     initContainers,
+			Containers:         containers,
+			SecurityContext:    securityContext,
+			Volumes:            volumes,
+			Affinity:           affinity,
+			ServiceAccountName: serviceAccountName,
 		},
 	}
 }

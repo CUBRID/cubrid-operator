@@ -14,8 +14,11 @@ import (
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	"github.com/cubrid/cubrid-operator/pkg/rbac"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // log is for logging in this package.
@@ -23,14 +26,26 @@ var stslogger = log.Log.WithName("StatufulSet")
 
 type StatefulSetManager struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme    *runtime.Scheme
+	clientset *kubernetes.Clientset
 }
 
-func NewStatefulSetManager(client client.Client, scheme *runtime.Scheme) *StatefulSetManager {
-	return &StatefulSetManager{
-		Client: client,
-		Scheme: scheme,
+func NewStatefulSetManager(client client.Client, scheme *runtime.Scheme) (*StatefulSetManager, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error getting in-cluster config: %v", err)
 	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating kubernetes clientset: %v", err)
+	}
+
+	return &StatefulSetManager{
+		Client:    client,
+		Scheme:    scheme,
+		clientset: clientset,
+	}, nil
 }
 
 func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
@@ -98,6 +113,15 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 		}
 	}
 
+	// Configure ServiceAccount
+	// Use one ServiceAccount per namespace
+	serviceAccountName := fmt.Sprintf("cubrid-%s-sa", cubridDB.Namespace)
+
+	// Create/Manage Role Based Access Control (RBAC) resources
+	if err := rbac.ReconcileRBACResources(r.clientset, cubridDB.Namespace); err != nil {
+		return fmt.Errorf("error reconciling RBAC resources: %v", err)
+	}
+
 	podTemplateSpec := pkg.CreatePodTemplateSpec(
 		pkg.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
 		initContainers,
@@ -105,6 +129,7 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 		pkg.CreatePodSecurityContext(DEF.CubridUser, DEF.CubridGroup),
 		volumes,
 		pkg.CreateAffinity(cubridDB),
+		serviceAccountName,
 	)
 
 	volumeClaimTemplates, err := pkg.NewPersistentVolumeClaims(cubridDB)

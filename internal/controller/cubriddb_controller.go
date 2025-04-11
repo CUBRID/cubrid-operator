@@ -75,8 +75,15 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Create service manager
 	serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
+	if serviceManager == nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create service manager")
+	}
 
-	statefulSetHandler := manager.NewStatefulSetManager(r.Client, r.Scheme)
+	statefulSetHandler, err := manager.NewStatefulSetManager(r.Client, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create StatefulSet manager: %v", err)
+	}
+
 	if err := statefulSetHandler.ReconcileStatefulSet(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, err
 	}
