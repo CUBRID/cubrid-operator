@@ -1,12 +1,14 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
 
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Service type constants
@@ -76,14 +78,23 @@ func CreateServiceLabels(appName string, serviceType ServiceType, additionalLabe
 	return labels
 }
 
-// ValidateNodePortRange validates the NodePort range
-func ValidateNodePortRange(startPort int32, count int32) error {
-	if startPort < 30000 || startPort > 32767 {
-		return fmt.Errorf("start port must be between 30000 and 32767")
+// ValidateNodePort validates if the given port is within the NodePort range.
+func ValidateNodePort(port int32) error {
+	if port < DEF.NodePortRangeMin || port > DEF.NodePortRangeMax {
+		return fmt.Errorf("port %d is not within the valid NodePort range (%d-%d)", port, DEF.NodePortRangeMin, DEF.NodePortRangeMax)
 	}
+	return nil
+}
+
+// ValidateNodePortRange validates if a range of ports is within the valid NodePort range
+func ValidateNodePortRange(startPort int32, count int32) error {
+	if err := ValidateNodePort(startPort); err != nil {
+		return err
+	}
+
 	endPort := startPort + count - 1
-	if endPort > 32767 {
-		return fmt.Errorf("port range exceeds maximum NodePort value (32767)")
+	if endPort > DEF.NodePortRangeMax {
+		return fmt.Errorf("port range %d-%d exceeds the maximum NodePort value %d", startPort, endPort, DEF.NodePortRangeMax)
 	}
 	return nil
 }
@@ -124,4 +135,69 @@ func CreateHeadlessService(cubridDBName string, namespace string, ports []corev1
 
 func CreateHeadlessServiceName(cubridDBName string) string {
 	return fmt.Sprintf("%s-%s", cubridDBName, DEF.SVC_NAME_SUFFIX)
+}
+
+// IsPortInUse checks if the given port is already in use by any service in any namespace.
+func IsPortInUse(ctx context.Context, client client.Client, port int32) (bool, error) {
+	services := &corev1.ServiceList{}
+	err := client.List(ctx, services)
+	if err != nil {
+		return false, fmt.Errorf("error listing services: %v", err)
+	}
+
+	for _, service := range services.Items {
+		for _, servicePort := range service.Spec.Ports {
+			if servicePort.NodePort == port {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// FindNextAvailablePort finds the next available port starting from the given port.
+// It checks if the port is already in use by any service in any namespace.
+// If the specified port is available, it returns that port.
+// Otherwise, it returns the next available port.
+func FindNextAvailablePort(ctx context.Context, client client.Client, startPort int32) (int32, error) {
+	// First validate if the start port is within the NodePort range
+	if err := ValidateNodePort(startPort); err != nil {
+		return 0, err
+	}
+
+	// Get all services in all namespaces
+	services := &corev1.ServiceList{}
+	err := client.List(ctx, services)
+	if err != nil {
+		return 0, fmt.Errorf("error listing services: %v", err)
+	}
+
+	// Create a map of used ports
+	usedPorts := make(map[int32]bool)
+	for _, service := range services.Items {
+		for _, port := range service.Spec.Ports {
+			if port.NodePort != 0 {
+				usedPorts[port.NodePort] = true
+			}
+		}
+	}
+
+	// Check if the start port is available
+	if !usedPorts[startPort] {
+		return startPort, nil
+	}
+
+	// Find the next available port
+	port := startPort + 1
+	for port <= DEF.NodePortRangeMax && usedPorts[port] {
+		port++
+	}
+
+	// Check if we found a valid port
+	if port > DEF.NodePortRangeMax {
+		return 0, fmt.Errorf("no available ports found in the NodePort range (%d-%d)", DEF.NodePortRangeMin, DEF.NodePortRangeMax)
+	}
+
+	return port, nil
 }

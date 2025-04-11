@@ -17,14 +17,11 @@ limitations under the License.
 package v1
 
 import (
-	"fmt"
-
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -212,17 +209,6 @@ func (c *CubridDB) HAmodeType() string {
 	}
 
 	return server_type
-}
-
-func (c *CubridDB) InternalServiceKey() types.NamespacedName {
-	return types.NamespacedName{
-		Name:      InternalServiceName(c.ObjectMeta.Name),
-		Namespace: c.ObjectMeta.Namespace,
-	}
-}
-
-func InternalServiceName(cubriddbName string) string {
-	return fmt.Sprintf("%s%s", cubriddbName, DEF.SVC_NAME_SUFFIX)
 }
 
 func (c *CubridDB) InitBroker() {

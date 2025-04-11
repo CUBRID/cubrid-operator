@@ -66,7 +66,7 @@ const (
 	SVC_PORT_SUFFIX          = "-port"
 	SVC_BR_NAME_QUERY_EDITOR = "cubrid-query-editor"
 	SVC_BR_NAME_BROKER1      = "cubrid-broker1"
-	SVC_HA_PORT              = 59901
+	SVC_HA_PORT_ID           = 59901 // This is the ha_port_id of cubrid_ha.conf.
 	SVC_HEADLESS_DNS         = "%s.%s"
 	SVC_HEADLESS_PORT_NAME   = "cubriddb-headless"
 	SVC_CMS_PORT_NAME        = "cubrid-cms-port"
@@ -104,4 +104,9 @@ const (
 
 	POD_DNS_FULL_NAME  = "%s.%s.%s.svc.cluster.local" // <pod-name>.<headless-service-name>.<namespace>.<base-domain>
 	POD_DNS_SHORT_NAME = "%s.%s"                      // <pod-name>.<headless-service-name>
+
+	// NodePortRangeMin is the minimum value for NodePort
+	NodePortRangeMin = 30000
+	// NodePortRangeMax is the maximum value for NodePort
+	NodePortRangeMax = 32767
 )

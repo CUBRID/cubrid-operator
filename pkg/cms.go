@@ -80,15 +80,18 @@ func CreateLoginCommand(id, password, clientVer string) *CMSCommand {
 		WithField("clientver", clientVer)
 }
 
-// CreateHAStatusCommand creates a HA status command
-func CreateHAStatusCommand(token string) *CMSCommand {
-	return NewCMSCommand(CommandHAStatus).
+// CreateLogoutCommand creates a logout command
+func CreateLogoutCommand(id, password, clientVer, token string) *CMSCommand {
+	return NewCMSCommand(CommandLogout).
+		WithField("id", id).
+		WithField("password", password).
+		WithField("clientver", clientVer).
 		WithToken(token)
 }
 
-// CreateLogoutCommand creates a logout command
-func CreateLogoutCommand(token string) *CMSCommand {
-	return NewCMSCommand(CommandLogout).
+// CreateHAStatusCommand creates a HA status command
+func CreateHAStatusCommand(token string) *CMSCommand {
+	return NewCMSCommand(CommandHAStatus).
 		WithToken(token)
 }
 

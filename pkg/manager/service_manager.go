@@ -60,13 +60,13 @@ func (m *ServiceManager) ReconcileServices(ctx context.Context, cubridDB *cubrid
 
 // reconcileHeadlessService creates or updates the headless service for StatefulSet
 func (m *ServiceManager) reconcileHeadlessService(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
-	fmt.Println("Start reconcileHeadlessService()")
+	svclogger.V(1).Info("Start reconcileHeadlessService()")
 	// Define service ports for headless service (HA port only)
 	ports := []corev1.ServicePort{
 		pkg.CreateServicePort(
 			DEF.SVC_HEADLESS_PORT_NAME,
-			DEF.SVC_HA_PORT,
-			DEF.SVC_HA_PORT,
+			DEF.SVC_HA_PORT_ID,
+			DEF.SVC_HA_PORT_ID,
 			0, // No NodePort needed for headless service
 			corev1.ProtocolTCP,
 		),
@@ -112,14 +112,17 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 		return m.cleanupServices(ctx, cubridDB, pkg.ServiceTypeCMS)
 	}
 
-	startPort := getCMSStartPort(cubridDB)
+	// Get the initial start port once
+	startNodePort := getCMSStartPort(cubridDB)
 	cmsPort := getCMSPort(cubridDB)
 
-	if err := pkg.ValidateNodePortRange(startPort, cubridDB.Spec.Replication.Replicas); err != nil {
-		return err
+	// Validate the initial start port
+	if err := pkg.ValidateNodePort(startNodePort); err != nil {
+		return fmt.Errorf("invalid initial CMS start port: %v", err)
 	}
 
-	for i := int32(0); i < cubridDB.Spec.Replication.Replicas; i++ {
+	// Create CMS service for connection for each pod in Cubrid Admin
+	for i := 0; i < int(cubridDB.Spec.Replication.Replicas); i++ {
 		podName := fmt.Sprintf("%s-%d", cubridDB.Name, i)
 
 		// Check if Pod exists
@@ -136,37 +139,59 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 			return err
 		}
 
-		// Create CMS service
-		svc := &corev1.Service{
+		serviceName := fmt.Sprintf("%s-cms-%d", cubridDB.Name, i)
+
+		// Check if the port is already in use
+		inUse, err := pkg.IsPortInUse(ctx, m.Client, startNodePort)
+		if err != nil {
+			return fmt.Errorf("error checking port availability for CMS service %s: %v", serviceName, err)
+		}
+
+		// If port is in use, find the next available port
+		if inUse {
+			startNodePort, err = pkg.FindNextAvailablePort(ctx, m.Client, startNodePort)
+			if err != nil {
+				return fmt.Errorf("error finding available port for CMS service %s: %v", serviceName, err)
+			}
+		}
+
+		// Create service ports
+		ports := []corev1.ServicePort{
+			pkg.CreateServicePort(
+				"cms",
+				cmsPort,
+				cmsPort,
+				startNodePort,
+				corev1.ProtocolTCP,
+			),
+		}
+
+		// Create service
+		service := &corev1.Service{
 			ObjectMeta: pkg.CreateServiceMeta(
-				fmt.Sprintf("%s-cms", podName),
+				serviceName,
 				cubridDB.Namespace,
 				pkg.CreateServiceLabels(cubridDB.Name, pkg.ServiceTypeCMS, nil),
 			),
 			Spec: pkg.CreateServiceSpec(
 				corev1.ServiceTypeNodePort,
-				[]corev1.ServicePort{
-					pkg.CreateServicePort(
-						"cms",
-						cmsPort,
-						cmsPort,
-						startPort+i,
-						corev1.ProtocolTCP,
-					),
-				},
+				ports,
 				pkg.CreateCMSSelector(podName),
 			),
 		}
 
 		// Set Pod as the owner of the service
-		if err := controllerutil.SetControllerReference(pod, svc, m.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(pod, service, m.Scheme); err != nil {
 			return fmt.Errorf("failed to set owner reference: %v", err)
 		}
 
 		// Create or update service
-		if err := m.createOrUpdateService(ctx, svc); err != nil {
+		if err := m.createOrUpdateService(ctx, service); err != nil {
 			return err
 		}
+
+		// Increment the port for the next service
+		startNodePort++
 	}
 
 	return nil
@@ -179,21 +204,36 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 	}
 
 	for _, broker := range cubridDB.Spec.Broker {
-		ports := []corev1.ServicePort{
-			pkg.CreateServicePort(
-				broker.Name,
-				broker.Port,
-				broker.Port,
-				0,
-				corev1.ProtocolTCP,
-			),
+		if broker.ServiceType != corev1.ServiceTypeNodePort {
+			continue
 		}
 
-		// Set NodePort if service type is NodePort
-		if broker.ServiceType == corev1.ServiceTypeNodePort && broker.ServicePort != 0 {
-			ports[0].NodePort = broker.ServicePort
+		// Get the port to use
+		port := broker.ServicePort
+
+		// Validate the port
+		if err := pkg.ValidateNodePort(port); err != nil {
+			return fmt.Errorf("invalid port %d for broker service %s: %v", port, broker.Name, err)
 		}
 
+		// Check if the port is already in use
+		inUse, err := pkg.IsPortInUse(ctx, m.Client, port)
+		if err != nil {
+			return fmt.Errorf("error checking port availability for broker service %s: %v", broker.Name, err)
+		}
+
+		// If port is in use, find the next available port
+		if inUse {
+			port, err = pkg.FindNextAvailablePort(ctx, m.Client, port)
+			if err != nil {
+				return fmt.Errorf("error finding available port for broker service %s: %v", broker.Name, err)
+			}
+		}
+
+		// Create service port
+		servicePort := pkg.CreateServicePort(broker.Name, port, port, port, corev1.ProtocolTCP)
+
+		// Create service
 		svc := &corev1.Service{
 			ObjectMeta: pkg.CreateServiceMeta(
 				broker.Name,
@@ -206,7 +246,7 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 			),
 			Spec: pkg.CreateServiceSpec(
 				broker.ServiceType,
-				ports,
+				[]corev1.ServicePort{servicePort},
 				pkg.CreateBrokerSelector(cubridDB.Name),
 			),
 		}
@@ -221,11 +261,11 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 		}
 	}
 
-	return m.cleanupUnusedBrokerServices(ctx, cubridDB)
+	return nil
 }
 
 func (m *ServiceManager) createOrUpdateService(ctx context.Context, svc *corev1.Service) error {
-	fmt.Println(fmt.Sprintf("Create or Update service : %s", svc.Name))
+	svclogger.V(1).Info("Create or Update service", "service name", svc.Name)
 	existing := &corev1.Service{}
 	err := m.Get(ctx, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, existing)
 	if err != nil {
@@ -260,33 +300,6 @@ func (m *ServiceManager) cleanupServices(ctx context.Context, cubridDB *cubridv1
 	return nil
 }
 
-func (m *ServiceManager) cleanupUnusedBrokerServices(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
-	configuredServices := make(map[string]bool)
-	for _, broker := range cubridDB.Spec.Broker {
-		configuredServices[broker.Name] = true
-	}
-
-	services := &corev1.ServiceList{}
-	if err := m.List(ctx, services,
-		client.InNamespace(cubridDB.Namespace),
-		client.MatchingLabels{
-			"app":     cubridDB.Name,
-			"service": string(pkg.ServiceTypeBroker),
-		}); err != nil {
-		return err
-	}
-
-	for _, svc := range services.Items {
-		if !configuredServices[svc.Name] {
-			if err := m.Delete(ctx, &svc); err != nil && !errors.IsNotFound(err) {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 func isCMSEnabled(cubridDB *cubridv1.CubridDB) bool {
 	return cubridDB.Spec.CMSService != nil &&
 		(cubridDB.Spec.CMSService.Enabled == nil || *cubridDB.Spec.CMSService.Enabled)
@@ -304,4 +317,50 @@ func getCMSPort(cubridDB *cubridv1.CubridDB) int32 {
 		return *cubridDB.Spec.CMSService.Port
 	}
 	return DEF.SVC_CMS_PORT
+}
+
+// findNextAvailablePort finds the next available port starting from the given port.
+// It checks if the port is already in use by any service in the namespace.
+// If the specified port is available, it returns that port.
+// Otherwise, it returns the next available port.
+func (m *ServiceManager) findNextAvailablePort(ctx context.Context, namespace string, specifiedPort int32) (int32, error) {
+	// Check if the port is within the valid NodePort range
+	if err := pkg.ValidateNodePort(specifiedPort); err != nil {
+		return 0, err
+	}
+
+	// Get all services in the namespace
+	services := &corev1.ServiceList{}
+	err := m.Client.List(ctx, services, client.InNamespace(namespace))
+	if err != nil {
+		return 0, fmt.Errorf("error listing services: %v", err)
+	}
+
+	// Create a map of used ports
+	usedPorts := make(map[int32]bool)
+	for _, service := range services.Items {
+		for _, port := range service.Spec.Ports {
+			if port.NodePort != 0 {
+				usedPorts[port.NodePort] = true
+			}
+		}
+	}
+
+	// Check if the specified port is available
+	if !usedPorts[specifiedPort] {
+		return specifiedPort, nil
+	}
+
+	// Find the next available port
+	port := specifiedPort + 1
+	for port <= DEF.NodePortRangeMax && usedPorts[port] {
+		port++
+	}
+
+	// Check if we found a valid port
+	if port > DEF.NodePortRangeMax {
+		return 0, fmt.Errorf("no available ports found in the NodePort range (%d-%d)", DEF.NodePortRangeMin, DEF.NodePortRangeMax)
+	}
+
+	return port, nil
 }
