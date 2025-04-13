@@ -19,9 +19,9 @@ spec:
   broker:
   - name: ms-broker1-svc
     port: 30000
-    servicePort: 30000
+    servicePort: 30100
     serviceType: NodePort
   - name: ms-broker2-svc
     port: 33000
-    servicePort: 30300
+    servicePort: 30101
     serviceType: NodePort

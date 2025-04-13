@@ -24,9 +24,9 @@ spec:
   broker:
   - name: rep-broker1-svc
     port: 30000
-    servicePort: 30100
+    servicePort: 30200
     serviceType: NodePort
   - name: rep-broker2-svc
     port: 33000
-    servicePort: 30101
+    servicePort: 30201
     serviceType: NodePort
