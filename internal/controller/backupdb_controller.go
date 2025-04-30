@@ -41,8 +41,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	"github.com/cubrid/cubrid-operator/pkg/util"
 	"github.com/robfig/cron/v3"
 	"k8s.io/client-go/util/exec"
 )
@@ -360,7 +360,7 @@ func (r *BackupDBReconciler) checkPodState(pod *corev1.Pod, backupPodName string
 		return fmt.Errorf("%s is not Running state (%s)", backupPodName, string(pod.Status.Phase))
 	}
 
-	isRunning, err := pkg.AllContainersRunning(pod)
+	isRunning, err := util.AllContainersRunning(pod)
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,7 @@ import (
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	"github.com/cubrid/cubrid-operator/pkg/util"
 )
 
 type ServiceManager struct {
@@ -180,10 +181,8 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 			),
 		}
 
-		// Set Pod as the owner of the service
-		if err := controllerutil.SetControllerReference(pod, service, m.Scheme); err != nil {
-			return fmt.Errorf("failed to set owner reference: %v", err)
-		}
+		// Set Pod as the owner of the service with blockOwnerDeletion set to false
+		util.SetOwnerReference(pod, service)
 
 		// Create or update service
 		if err := m.createOrUpdateService(ctx, service); err != nil {
@@ -208,30 +207,8 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 			continue
 		}
 
-		// Get the port to use
-		port := broker.ServicePort
-
-		// Validate the port
-		if err := pkg.ValidateNodePort(port); err != nil {
-			return fmt.Errorf("invalid port %d for broker service %s: %v", port, broker.Name, err)
-		}
-
-		// Check if the port is already in use
-		inUse, err := pkg.IsPortInUse(ctx, m.Client, port)
-		if err != nil {
-			return fmt.Errorf("error checking port availability for broker service %s: %v", broker.Name, err)
-		}
-
-		// If port is in use, find the next available port
-		if inUse {
-			port, err = pkg.FindNextAvailablePort(ctx, m.Client, port)
-			if err != nil {
-				return fmt.Errorf("error finding available port for broker service %s: %v", broker.Name, err)
-			}
-		}
-
 		// Create service port
-		servicePort := pkg.CreateServicePort(broker.Name, broker.Port, broker.Port, port, corev1.ProtocolTCP)
+		servicePort := pkg.CreateServicePort(broker.Name, broker.Port, broker.Port, broker.ServicePort, corev1.ProtocolTCP)
 
 		// Create service
 		svc := &corev1.Service{

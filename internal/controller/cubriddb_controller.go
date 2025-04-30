@@ -23,9 +23,9 @@ import (
 	"time"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	manager "github.com/cubrid/cubrid-operator/pkg/manager"
+	"github.com/cubrid/cubrid-operator/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -175,14 +175,14 @@ func (r *CubridDBReconciler) podAdded(obj interface{}) {
 		return
 	}
 
-	cubriddb, err := pkg.GetCubridDBFromPod(r.Client, addPod)
+	cubriddb, err := util.GetCubridDBFromPod(r.Client, addPod)
 	if err != nil {
 		cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to get CubridDB for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
 		return
 	}
 
 	if cubriddb.IsHAEnabled() {
-		if err := pkg.UpdateCubridDB(context.Background(), r.Client, addPod); err != nil {
+		if err := util.UpdateCubridDB(context.Background(), r.Client, addPod); err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to update CubridDB for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
 			return
 		}
@@ -194,7 +194,7 @@ func (r *CubridDBReconciler) podUpdated(oldObj, newObj interface{}) {
 	newPod := newObj.(*corev1.Pod)
 
 	if oldPod.Status.Phase != corev1.PodRunning && newPod.Status.Phase == corev1.PodRunning {
-		cubriddb, err := pkg.GetCubridDBFromPod(r.Client, newPod)
+		cubriddb, err := util.GetCubridDBFromPod(r.Client, newPod)
 		if err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("Failed to get CubridDB for updated Pod %s/%s", newPod.Namespace, newPod.Name), "error", err.Error())
 			return
@@ -235,14 +235,14 @@ func (r *CubridDBReconciler) podDeleted(obj interface{}) {
 
 	deletedPod := obj.(*corev1.Pod)
 
-	cubriddb, err := pkg.GetCubridDBFromPod(r.Client, deletedPod)
+	cubriddb, err := util.GetCubridDBFromPod(r.Client, deletedPod)
 	if err != nil {
 		cubriddblog.V(1).Info(fmt.Sprintf("Failed to get CubridDB for deleted pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
 		return
 	}
 
 	if cubriddb.IsHAEnabled() {
-		err = pkg.UpdateCubridDB(context.Background(), r.Client, deletedPod)
+		err = util.UpdateCubridDB(context.Background(), r.Client, deletedPod)
 		if err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("Failed to update CubridDB for deleted pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
 			return
@@ -309,7 +309,7 @@ func (r *CubridDBReconciler) cubridAdded(obj interface{}) {
 		if cubriddb.Spec.Replication.HAmodeType.Type == DEF.HA_MASTER_SLAVE_TYPE {
 
 		} else if cubriddb.Spec.Replication.HAmodeType.Type == DEF.HA_REPLICA_TYPE {
-			msCubridDB, err = pkg.GetCubridDBByName(
+			msCubridDB, err = util.GetCubridDBByName(
 				r.Client,
 				cubriddb.Namespace,
 				cubriddb.Spec.Replication.HAmodeType.CubridRef.Name)
@@ -319,7 +319,7 @@ func (r *CubridDBReconciler) cubridAdded(obj interface{}) {
 				return
 			}
 
-			err = pkg.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, DEF.ADD_REPLICALINK)
+			err = util.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, DEF.ADD_REPLICALINK)
 			if err != nil {
 				cubriddblog.V(1).Info(fmt.Sprintf("Failed to update replica link : Master CubridDB Name %s, Replica CubridDB Name %s",
 					msCubridDB.Name, cubriddb.Name), "error", err.Error())
@@ -339,7 +339,7 @@ func (r *CubridDBReconciler) cubridDeleted(obj interface{}) {
 	}
 
 	if cubriddb.Replication().Enable && cubriddb.HAmodeType() == DEF.HA_REPLICA_TYPE {
-		msCubridDB, err = pkg.GetCubridDBByName(
+		msCubridDB, err = util.GetCubridDBByName(
 			r.Client,
 			cubriddb.Namespace,
 			cubriddb.Spec.Replication.HAmodeType.CubridRef.Name)
@@ -350,7 +350,7 @@ func (r *CubridDBReconciler) cubridDeleted(obj interface{}) {
 			return
 		}
 
-		err = pkg.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, DEF.DELETE_REPLICALINK)
+		err = util.UpdateReplicaLink(r.Client, msCubridDB, cubriddb.Name, DEF.DELETE_REPLICALINK)
 		if err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("Failed to delete replica link : Master CubridDB Name %s, Replica CubridDB Name %s",
 				msCubridDB.Name, cubriddb.Name), "errro", err.Error())

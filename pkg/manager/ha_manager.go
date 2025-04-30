@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	"github.com/cubrid/cubrid-operator/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,7 +53,7 @@ func (r *HAManager) ReconcileHAMode(
 		msCubridDBName = cubridDB.Name
 
 		// Ensure that CubridRef is initialized
-		replicaRef := pkg.InitCubridRef(cubridDB)
+		replicaRef := util.InitCubridRef(cubridDB)
 		replicaCubridDBName = replicaRef.ReplicaLink
 
 		halog.Info("Master-Slave info", "Master-Slave", msCubridDBName, "Replica", replicaCubridDBName)
@@ -303,7 +303,7 @@ func CreateDNSList(pods []corev1.Pod, serviceName, namespace string) []string {
 		if hostname == "" {
 			hostname = pod.Name
 		}
-		dnsName := pkg.CreateDNSShortName(hostname, serviceName)
+		dnsName := util.CreateDNSShortName(hostname, serviceName)
 		dnsList = append(dnsList, dnsName)
 	}
 	return dnsList

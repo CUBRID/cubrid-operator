@@ -16,6 +16,7 @@ import (
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	"github.com/cubrid/cubrid-operator/pkg/util"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
@@ -51,7 +52,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 		var retToken string
 		var isSuccess bool = false
 
-		httpUrls, errCode = pkg.CreatePodFullURLs(ctx, client, cubriddb.Name, cubriddb.Namespace, DEF.CMS_PORT)
+		httpUrls, errCode = util.CreatePodFullURLs(ctx, client, cubriddb.Name, cubriddb.Namespace, DEF.CMS_PORT)
 		if errCode != nil {
 			errorMessage = fmt.Errorf("error CreatePodFullURLs: %v", errCode)
 			goto End
