@@ -335,10 +335,8 @@ func (in *CubridDBStatus) DeepCopyInto(out *CubridDBStatus) {
 	}
 	if in.NodeLists != nil {
 		in, out := &in.NodeLists, &out.NodeLists
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	in.LastUpdated.DeepCopyInto(&out.LastUpdated)
 }

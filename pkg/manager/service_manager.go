@@ -39,21 +39,28 @@ func (m *ServiceManager) ReconcileServices(ctx context.Context, cubridDB *cubrid
 	// Reconcile CMS services creates or updates CMS services for CUBRID Manager Server
 	// Reconcile Broker services creates or updates broker services for CUBRID Broker
 	// Reconcile Headless service creates or updates headless service for HA mode
-
+	var errs []error
+	
 	// Reconcile CMS services
 	if err := m.reconcileCMSServices(ctx, cubridDB); err != nil {
-		return fmt.Errorf("failed to reconcile CMS services: %v", err)
+		errs = append(errs, fmt.Errorf("failed to reconcile CMS services: %v", err))
 	}
 
 	// Reconcile Broker services
 	if err := m.reconcileBrokerServices(ctx, cubridDB); err != nil {
-		return fmt.Errorf("failed to reconcile broker services: %v", err)
+		errs = append(errs, fmt.Errorf("failed to reconcile broker services: %v", err))
 	}
 
+	// Reconcile Headless service if HA is enabled
 	if cubridDB.IsHAEnabled() {
 		if err := m.reconcileHeadlessService(ctx, cubridDB); err != nil {
-			return fmt.Errorf("failed to reconcile headless service: %v", err)
+			errs = append(errs, fmt.Errorf("failed to reconcile headless service: %v", err))
 		}
+	}
+
+	// If any errors occurred, return them as a single error
+	if len(errs) > 0 {
+		return fmt.Errorf("service reconciliation errors: %v", errs)
 	}
 
 	return nil
@@ -142,17 +149,32 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 
 		serviceName := fmt.Sprintf("%s-cms-%d", cubridDB.Name, i)
 
-		// Check if the port is already in use
-		inUse, err := pkg.IsPortInUse(ctx, m.Client, startNodePort)
-		if err != nil {
-			return fmt.Errorf("error checking port availability for CMS service %s: %v", serviceName, err)
-		}
-
-		// If port is in use, find the next available port
-		if inUse {
-			startNodePort, err = pkg.FindNextAvailablePort(ctx, m.Client, startNodePort)
+		// Check if service already exists
+		existingService := &corev1.Service{}
+		err = m.Get(ctx, types.NamespacedName{
+			Name:      serviceName,
+			Namespace: cubridDB.Namespace,
+		}, existingService)
+		if err == nil {
+			// Service exists, use its existing NodePort
+			if len(existingService.Spec.Ports) > 0 {
+				startNodePort = existingService.Spec.Ports[0].NodePort
+			}
+		} else if !errors.IsNotFound(err) {
+			return fmt.Errorf("error checking existing service %s: %v", serviceName, err)
+		} else {
+			// Service doesn't exist, check if the port is available
+			inUse, err := pkg.IsPortInUse(ctx, m.Client, startNodePort, serviceName)
 			if err != nil {
-				return fmt.Errorf("error finding available port for CMS service %s: %v", serviceName, err)
+				return fmt.Errorf("error checking port availability for CMS service %s: %v", serviceName, err)
+			}
+
+			// If port is in use, find the next available port
+			if inUse {
+				startNodePort, err = pkg.FindNextAvailablePort(ctx, m.Client, startNodePort, serviceName)
+				if err != nil {
+					return fmt.Errorf("error finding available port for CMS service %s: %v", serviceName, err)
+				}
 			}
 		}
 
@@ -184,9 +206,9 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 		// Set Pod as the owner of the service with blockOwnerDeletion set to false
 		util.SetOwnerReference(pod, service)
 
-		// Create or update service
+		// Create or update service to allow user modifications
 		if err := m.createOrUpdateService(ctx, service); err != nil {
-			return err
+			return fmt.Errorf("failed to create/update CMS service %s: %v", serviceName, err)
 		}
 
 		// Increment the port for the next service

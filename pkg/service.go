@@ -138,7 +138,7 @@ func CreateHeadlessServiceName(cubridDBName string) string {
 }
 
 // IsPortInUse checks if the given port is already in use by any service in any namespace.
-func IsPortInUse(ctx context.Context, client client.Client, port int32) (bool, error) {
+func IsPortInUse(ctx context.Context, client client.Client, port int32, excludeServiceName string) (bool, error) {
 	services := &corev1.ServiceList{}
 	err := client.List(ctx, services)
 	if err != nil {
@@ -146,6 +146,10 @@ func IsPortInUse(ctx context.Context, client client.Client, port int32) (bool, e
 	}
 
 	for _, service := range services.Items {
+		// Skip the service that we want to exclude
+		if service.Name == excludeServiceName {
+			continue
+		}
 		for _, servicePort := range service.Spec.Ports {
 			if servicePort.NodePort == port {
 				return true, nil
@@ -160,7 +164,7 @@ func IsPortInUse(ctx context.Context, client client.Client, port int32) (bool, e
 // It checks if the port is already in use by any service in any namespace.
 // If the specified port is available, it returns that port.
 // Otherwise, it returns the next available port.
-func FindNextAvailablePort(ctx context.Context, client client.Client, startPort int32) (int32, error) {
+func FindNextAvailablePort(ctx context.Context, client client.Client, startPort int32, excludeServiceName string) (int32, error) {
 	// First validate if the start port is within the NodePort range
 	if err := ValidateNodePort(startPort); err != nil {
 		return 0, err
@@ -176,6 +180,10 @@ func FindNextAvailablePort(ctx context.Context, client client.Client, startPort 
 	// Create a map of used ports
 	usedPorts := make(map[int32]bool)
 	for _, service := range services.Items {
+		// Skip the service that we want to exclude
+		if service.Name == excludeServiceName {
+			continue
+		}
 		for _, port := range service.Spec.Ports {
 			if port.NodePort != 0 {
 				usedPorts[port.NodePort] = true

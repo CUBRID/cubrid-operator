@@ -4,8 +4,13 @@ metadata:
   labels:
     app.kubernetes.io/name: cubrid-operator
     app.kubernetes.io/managed-by: kustomize
-  name: cubrid-test
+  name: cubrid-s2
 spec:
   image: airnet73/cubrid:v11.4.0.1778
   replication:
     enable: false
+  broker:
+  - name: ms-broker-svc2
+    port: 36000
+    servicePort: 30100
+    serviceType: NodePort

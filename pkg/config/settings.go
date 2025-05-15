@@ -86,9 +86,9 @@ const (
 	HAMODE_ON         = "ON"
 	HAMODE_OFF        = "OFF"
 	HAMODE_STANDALONE = "STANDALONE"
-	HAMODE_MASTER     = "Master"
-	HAMODE_SLAVE      = "Slave"
-	HAMODE_REPLICA    = "Replica"
+	HAMODE_MASTER     = "master"
+	HAMODE_SLAVE      = "slave"
+	HAMODE_REPLICA    = "replica"
 	HAMODE_UNKONW     = "Unkonw"
 
 	// Cubrid Manager Server

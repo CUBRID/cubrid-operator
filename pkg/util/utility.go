@@ -1,4 +1,4 @@
-package pkg
+package util
 
 import (
 	"context"
@@ -10,7 +10,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -384,7 +386,20 @@ func CreatePodFullURLs(
 		podDNSName := CreateDNSFullName(pod.Name, serviceName, namespace)
 		fullURL := GenerateFullURL(podDNSName, DEF.CMS_PORT)
 		urls = append(urls, fullURL)
+
+		// fmt.Printf("fullURL : %s\n", fullURL)
 	}
 
 	return urls, nil
+}
+
+// SetOwnerReference sets the owner reference for a resource without blocking owner deletion
+func SetOwnerReference(owner runtime.Object, resource v1.Object) {
+	ownerRef := v1.OwnerReference{
+		APIVersion: owner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+		Kind:       owner.GetObjectKind().GroupVersionKind().Kind,
+		Name:       owner.(v1.Object).GetName(),
+		UID:        owner.(v1.Object).GetUID(),
+	}
+	resource.SetOwnerReferences([]v1.OwnerReference{ownerRef})
 }

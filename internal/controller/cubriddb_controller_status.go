@@ -7,9 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,8 +15,6 @@ import (
 	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	"github.com/cubrid/cubrid-operator/pkg/util"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,8 +37,8 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	var errCode error
 	var errorMessage error
 	var httpUrls []string
-	var listStatus map[string]string
-	listStatus = make(map[string]string)
+	var listStatus []string
+	listStatus = make([]string, 0)
 
 	currentStatusWithoutLastUpdated := cubriddb.Status.DeepCopy()
 
@@ -100,7 +96,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	End:
 		if isError {
 			cubriddb.Status.HaMode = DEF.HAMODE_ON
-			cubriddb.Status.NodeLists = make(map[string]string)
+			cubriddb.Status.NodeLists = []string{fmt.Sprintf("%s: %s", cubriddb.Name, DEF.HAMODE_UNKONW)}
 			cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
 			cubriddb.Status.CurrentMaster = DEF.HAMODE_UNKONW
 		} else {
@@ -109,9 +105,10 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 			cubriddb.Status.NodeLists = listStatus
 			cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
 
-			for node, state := range listStatus {
-				if state == DEF.HAMODE_MASTER {
-					cubriddb.Status.CurrentMaster = node
+			for _, nodeStatus := range listStatus {
+				parts := strings.Split(nodeStatus, ": ")
+				if len(parts) == 2 && parts[1] == DEF.HAMODE_MASTER {
+					cubriddb.Status.CurrentMaster = parts[0]
 					break
 				}
 			}
@@ -119,7 +116,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	} else {
 		cubriddb.Status.HaMode = DEF.HAMODE_OFF
 		cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
-		cubriddb.Status.NodeLists = map[string]string{cubriddb.Name: DEF.HAMODE_STANDALONE}
+		cubriddb.Status.NodeLists = []string{fmt.Sprintf("%s", DEF.HAMODE_STANDALONE)}
 		cubriddb.Status.CurrentMaster = cubriddb.Name
 	}
 
@@ -129,10 +126,10 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	currentStatusWithoutLastUpdated.LastUpdated = metav1.Time{}
 
 	if currentStatusWithoutLastUpdated.NodeLists == nil {
-		currentStatusWithoutLastUpdated.NodeLists = map[string]string{}
+		currentStatusWithoutLastUpdated.NodeLists = []string{}
 	}
 	if newStatusWithoutLastUpdated.NodeLists == nil {
-		newStatusWithoutLastUpdated.NodeLists = map[string]string{}
+		newStatusWithoutLastUpdated.NodeLists = []string{}
 	}
 
 	if reflect.DeepEqual(currentStatusWithoutLastUpdated, newStatusWithoutLastUpdated) {
@@ -152,63 +149,54 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	}
 }
 
-func parseHANodesStatus(responseMap map[string]interface{}) (map[string]string, error) {
-	replicationStatus := make(map[string]string)
+// parseHANodesStatus parses the HA status and returns a slice of node status strings in order
+func parseHANodesStatus(result map[string]interface{}) ([]string, error) {
+	nodes := make(map[string]string)
 
-	nodePattern := regexp.MustCompile(`^node[A-Za-z]+$`)
-
-	for key, value := range responseMap {
-		if match := nodePattern.FindStringSubmatch(key); match != nil {
-			node := fmt.Sprintf("%v", value)
-
-			parts := strings.Split(node, ".")
-			if len(parts) > 1 {
-				node = parts[0]
+	// Add all existing nodes
+	for key, value := range result {
+		if strings.HasPrefix(key, "node") && !strings.HasSuffix(key, "_state") {
+			if nodeValue, ok := value.(string); ok {
+				stateKey := key + "_state"
+				if stateValue, ok := result[stateKey].(string); ok {
+					nodeName := strings.Split(nodeValue, ".")[0]
+					nodes[nodeName] = stateValue
+				}
 			}
-
-			stateKey := fmt.Sprintf("%s_state", key)
-			state, ok := responseMap[stateKey].(string)
-			if !ok {
-				cubriddblog.V(2).Info("State key not found for node", "stateKey", stateKey, "node", node)
-				continue
-			}
-			repCase := cases.Title(language.English)
-			replicationStatus[node] = repCase.String(state)
 		}
 	}
 
-	if len(replicationStatus) == 0 {
-		return nil, fmt.Errorf("no valid nodes found in ha_status response")
-	}
+	// Create ordered slice of node status strings
+	var orderedNodes []string
 
-	priority := map[string]int{DEF.HAMODE_MASTER: 0, DEF.HAMODE_SLAVE: 1, DEF.HAMODE_REPLICA: 2}
-
-	sortedNodes := make([]nodeStatus, 0, len(replicationStatus))
-	for node, state := range replicationStatus {
-		sortedNodes = append(sortedNodes, nodeStatus{node: node, state: state})
-	}
-
-	sort.Slice(sortedNodes, func(i, j int) bool {
-		numPattern := regexp.MustCompile(`\d+`)
-		iNumStr := numPattern.FindString(sortedNodes[i].node)
-		jNumStr := numPattern.FindString(sortedNodes[j].node)
-
-		iNum, _ := strconv.Atoi(iNumStr)
-		jNum, _ := strconv.Atoi(jNumStr)
-
-		if iNum != jNum {
-			return iNum < jNum
+	// Helper function to get sorted nodes by role
+	getSortedNodesByRole := func(role string) []string {
+		var roleNodes []string
+		for node, state := range nodes {
+			if strings.ToLower(state) == strings.ToLower(role) {
+				roleNodes = append(roleNodes, node)
+			}
 		}
-
-		return priority[sortedNodes[i].state] < priority[sortedNodes[j].state]
-	})
-
-	sortedReplicationStatus := make(map[string]string)
-	for _, ns := range sortedNodes {
-		sortedReplicationStatus[ns.node] = ns.state
+		sort.Strings(roleNodes)
+		return roleNodes
 	}
 
-	return sortedReplicationStatus, nil
+	// First, add master nodes
+	for _, node := range getSortedNodesByRole(DEF.HAMODE_MASTER) {
+		orderedNodes = append(orderedNodes, fmt.Sprintf("%s: %s", node, nodes[node]))
+	}
+
+	// Then, add slave nodes in alphabetical order
+	for _, node := range getSortedNodesByRole(DEF.HAMODE_SLAVE) {
+		orderedNodes = append(orderedNodes, fmt.Sprintf("%s: %s", node, nodes[node]))
+	}
+
+	// Finally, add replica nodes in alphabetical order
+	for _, node := range getSortedNodesByRole(DEF.HAMODE_REPLICA) {
+		orderedNodes = append(orderedNodes, fmt.Sprintf("%s: %s", node, nodes[node]))
+	}
+
+	return orderedNodes, nil
 }
 
 func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string) (string, error) {

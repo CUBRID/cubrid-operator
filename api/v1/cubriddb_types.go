@@ -50,7 +50,7 @@ type CubridDBStatus struct {
 	Conditions    []metav1.Condition `json:"conditions,omitempty"`
 	HaMode        string             `json:"hamode,omitempty"`
 	CurrentMaster string             `json:"currentMaster,omitempty"`
-	NodeLists     map[string]string  `json:"nodeLists,omitempty"`
+	NodeLists     []string           `json:"nodeLists,omitempty"`
 	LastUpdated   metav1.Time        `json:"lastUpdated,omitempty"`
 }
 
