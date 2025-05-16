@@ -143,12 +143,25 @@ run-webhook: manifests generate fmt vet ## Run a webhook server from your host.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+docker-build: ## Build docker image with the manager. Usage: make docker-build [IMAGE=<registry/image:tag>]
+	@if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		$(CONTAINER_TOOL) build -t $(filter-out $@,$(MAKECMDGOALS)) . ; \
+	else \
+		$(CONTAINER_TOOL) build -t ${IMG} . ; \
+	fi
+
+.PHONY: docker-images
+docker-images: ## List all docker images
+	@echo "=== Docker Images ==="
+	@$(CONTAINER_TOOL) images
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) push ${IMG}
+docker-push: ## Push docker image with the manager. Usage: make docker-push [IMAGE=<registry/image:tag>]
+	@if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
+		$(CONTAINER_TOOL) push $(filter-out $@,$(MAKECMDGOALS)) ; \
+	else \
+		$(CONTAINER_TOOL) push ${IMG} ; \
+	fi
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
