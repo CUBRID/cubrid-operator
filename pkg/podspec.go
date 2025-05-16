@@ -40,14 +40,14 @@ func CreateInitContainers(
 			DEF.InitCopyConfContainerName,
 			cubridDB.Spec.Image,
 			[]string{"sh", "-c", DEF.InitCopyConfCommand},
-			ConfigureSecurityContext(0, 0),
+			ConfigureSecurityContext(DEF.CubridUser, DEF.CubridGroup),
 			CreateVolumeMounts(copyConfVolumeMountSpecs),
 		),
 		CreateInitContainer(
 			DEF.InitRecoveryConfContainerName,
 			cubridDB.Spec.InitContainerImage,
 			[]string{"sh", "-c", DEF.InitRecoveryConfCommand},
-			ConfigureSecurityContext(0, 0),
+			ConfigureSecurityContext(DEF.CubridUser, DEF.CubridGroup),
 			CreateVolumeMounts(recoveryConfVolumeMountSpecs),
 		),
 	}
@@ -112,9 +112,11 @@ func ConfigureSecurityContext(runAsUser int64, runAsGroup int64) *corev1.Securit
 }
 
 func CreatePodSecurityContext(runAsUser, runAsGroup int64) *corev1.PodSecurityContext {
+	fsGroup := DEF.CubridGroup
 	return &corev1.PodSecurityContext{
 		RunAsUser:  &runAsUser,
 		RunAsGroup: &runAsGroup,
+		FSGroup:    &fsGroup,
 	}
 }
 

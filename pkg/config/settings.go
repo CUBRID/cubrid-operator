@@ -40,11 +40,22 @@ const (
 	InitRecoveryConfContainerName = "init-recovery-conf"
 	InitCopyConfCommand           = "cp -rn /home/cubrid/CUBRID/conf/* /mnt/conf"
 	InitRecoveryConfCommand       = "cp -rn /mnt/conf/* /home/cubrid/CUBRID/conf/ && " +
-		"chown -R 1000:1000 /home/cubrid/CUBRID/conf && " +
-		"chown -R 1000:1000 /home/cubrid/CUBRID/databases && " +
-		"chown -R 1000:1000 /home/cubrid/CUBRID/backupdb && " +
-		"chown -R 1000:1000 /home/cubrid/CUBRID/log"
-	BusyBoxImage = "busybox"
+		"find /home/cubrid/CUBRID/conf -type f -not -path '*/lost+found/*' -exec chmod 644 {} \\; && " +
+		"find /home/cubrid/CUBRID/conf -type d -not -path '*/lost+found*' -exec chmod 755 {} \\; && " +
+		"find /home/cubrid/CUBRID/conf -type f -not -path '*/lost+found/*' -exec chown 1000:1000 {} \\; && " +
+		"find /home/cubrid/CUBRID/conf -type d -not -path '*/lost+found*' -exec chown 1000:1000 {} \\; && " +
+		"find /home/cubrid/CUBRID/databases -type f -not -path '*/lost+found/*' -exec chmod 644 {} \\; && " +
+		"find /home/cubrid/CUBRID/databases -type d -not -path '*/lost+found*' -exec chmod 755 {} \\; && " +
+		"find /home/cubrid/CUBRID/databases -type f -not -path '*/lost+found/*' -exec chown 1000:1000 {} \\; && " +
+		"find /home/cubrid/CUBRID/databases -type d -not -path '*/lost+found*' -exec chown 1000:1000 {} \\; && " +
+		"find /home/cubrid/CUBRID/backupdb -type f -not -path '*/lost+found/*' -exec chmod 644 {} \\; && " +
+		"find /home/cubrid/CUBRID/backupdb -type d -not -path '*/lost+found*' -exec chmod 755 {} \\; && " +
+		"find /home/cubrid/CUBRID/backupdb -type f -not -path '*/lost+found/*' -exec chown 1000:1000 {} \\; && " +
+		"find /home/cubrid/CUBRID/backupdb -type d -not -path '*/lost+found*' -exec chown 1000:1000 {} \\; && " +
+		"find /home/cubrid/CUBRID/log -type f -not -path '*/lost+found/*' -exec chmod 644 {} \\; && " +
+		"find /home/cubrid/CUBRID/log -type d -not -path '*/lost+found*' -exec chmod 755 {} \\; && " +
+		"find /home/cubrid/CUBRID/log -type f -not -path '*/lost+found/*' -exec chown 1000:1000 {} \\; && " +
+		"find /home/cubrid/CUBRID/log -type d -not -path '*/lost+found*' -exec chown 1000:1000 {} \\;"
 
 	// user
 	CubridUser  = int64(1000)

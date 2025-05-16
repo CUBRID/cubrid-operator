@@ -4,8 +4,18 @@ metadata:
   labels:
     app.kubernetes.io/name: cubrid-operator
     app.kubernetes.io/managed-by: kustomize
-  name: cubrid-test
+  name: cubrid-single
 spec:
   image: airnet73/cubrid:v11.4-latest
+  initContainerImage: busybox
   replication:
     enable: false
+  broker:
+  - name: s-broker1-svc
+    port: 30000
+    servicePort: 30100
+    serviceType: NodePort
+  - name: s-broker2-svc
+    port: 33000
+    servicePort: 30101
+    serviceType: NodePort
