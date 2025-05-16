@@ -6,6 +6,7 @@ import (
 
 const (
 	CubridDefaultImage        = "cubrid/cubrid:latest"
+	InitContainerDefaultImage = "busybox:latest"
 	DefaultCUBRIDPath         = "/home/cubrid/CUBRID"
 	HATemplateFilePath        = "share/scripts/operator_conf.sh"
 	StorageType_conf          = "conf-storage-type"

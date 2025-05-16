@@ -45,7 +45,7 @@ func CreateInitContainers(
 		),
 		CreateInitContainer(
 			DEF.InitRecoveryConfContainerName,
-			DEF.BusyBoxImage,
+			cubridDB.Spec.InitContainerImage,
 			[]string{"sh", "-c", DEF.InitRecoveryConfCommand},
 			ConfigureSecurityContext(0, 0),
 			CreateVolumeMounts(recoveryConfVolumeMountSpecs),

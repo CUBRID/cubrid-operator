@@ -32,15 +32,16 @@ type CubridDBSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Replication     *Replication                      `json:"replication,omitempty"`
-	Affinity        *Affinity                         `json:"affinty,omitempty"`
-	Broker          []Broker                          `json:"broker,omitempty"`
-	CMSService      *CMSServiceConfig                 `json:"cmsService,omitempty"`
-	Image           string                            `json:"image,omitempty"`
-	Storage         []Storage                         `json:"storage,omitempty"`
-	Label           string                            `json:"label,omitempty"`
-	UpdateStrategy  *appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
-	ImagePullPolicy corev1.PullPolicy                 `json:"imagePullPolicy,omitempty"`
+	Replication        *Replication                      `json:"replication,omitempty"`
+	Affinity           *Affinity                         `json:"affinty,omitempty"`
+	Broker             []Broker                          `json:"broker,omitempty"`
+	CMSService         *CMSServiceConfig                 `json:"cmsService,omitempty"`
+	Image              string                            `json:"image,omitempty"`
+	InitContainerImage string                            `json:"initContainerImage,omitempty"`
+	Storage            []Storage                         `json:"storage,omitempty"`
+	Label              string                            `json:"label,omitempty"`
+	UpdateStrategy     *appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	ImagePullPolicy    corev1.PullPolicy                 `json:"imagePullPolicy,omitempty"`
 }
 
 // CubridDBStatus defines the observed state of CubridDB
@@ -234,6 +235,9 @@ func (c *CubridDB) InitBroker() {
 func (c *CubridDB) InitImage() {
 	if c.Spec.Image == "" {
 		c.Spec.Image = DEF.CubridDefaultImage
+	}
+	if c.Spec.InitContainerImage == "" {
+		c.Spec.InitContainerImage = DEF.InitContainerDefaultImage
 	}
 }
 

@@ -102,6 +102,8 @@ spec:
                 description: PullPolicy describes a policy for if/when to pull a container
                   image
                 type: string
+              initContainerImage:
+                type: string
               label:
                 type: string
               replication:

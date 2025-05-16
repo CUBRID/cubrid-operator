@@ -6,6 +6,6 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: cubrid-test
 spec:
-  image: airnet73/cubrid:v11.4.0.1778
+  image: airnet73/cubrid:v11.4-latest
   replication:
     enable: false

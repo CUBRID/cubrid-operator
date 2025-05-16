@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -274,9 +275,31 @@ func (m *ServiceManager) createOrUpdateService(ctx context.Context, svc *corev1.
 		return err
 	}
 
-	existing.Spec = svc.Spec
-	existing.Labels = svc.Labels
-	return m.Update(ctx, existing)
+	// Check if there are any changes
+	needsUpdate := false
+
+	// Compare Spec
+	if existing.Spec.Type != svc.Spec.Type {
+		needsUpdate = true
+	} else if !reflect.DeepEqual(existing.Spec.Ports, svc.Spec.Ports) {
+		needsUpdate = true
+	} else if !reflect.DeepEqual(existing.Spec.Selector, svc.Spec.Selector) {
+		needsUpdate = true
+	}
+
+	// Compare Labels
+	if !reflect.DeepEqual(existing.Labels, svc.Labels) {
+		needsUpdate = true
+	}
+
+	// Only update if there are changes
+	if needsUpdate {
+		existing.Spec = svc.Spec
+		existing.Labels = svc.Labels
+		return m.Update(ctx, existing)
+	}
+
+	return nil
 }
 
 func (m *ServiceManager) cleanupServices(ctx context.Context, cubridDB *cubridv1.CubridDB, serviceType pkg.ServiceType) error {
