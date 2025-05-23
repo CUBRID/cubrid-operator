@@ -12,7 +12,7 @@ spec:
   ports:
     - port: 443
       protocol: TCP
-      targetPort: 4443
+      targetPort: {{ .Values.webhook.ports.webhook }}
   selector:
     app: {{ $fullName }}-webhook-dep
 {{- end }}    

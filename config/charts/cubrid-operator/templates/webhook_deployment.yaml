@@ -12,7 +12,7 @@ spec:
       app: {{ $fullName }}-webhook-dep
   template:
     metadata:
-      {{- with .Values.webhook.podAnnotationss }}
+      {{- with .Values.webhook.podAnnotations }}
       annotations:
         {{ toYaml . | nindent 8 }}
       {{- end }}
@@ -21,18 +21,61 @@ spec:
         control-plane: controller-manager  
     spec:
       serviceAccountName: {{ include "cubrid-operator-webhook.serviceAccountName" . }}
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: {{ $fullName }}-webhook-dep
-        image: airnet73/operator:latest
-        args: ["webhook"]  
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        command: ["./manager"]
+        args:
+          - webhook
+          - --webhook-cert-dir={{ .Values.webhook.certDir }}
+          - --webhook-port={{ .Values.webhook.ports.webhook }}
+          - --webhook-service-name={{ include "cubrid-operator-webhook.serviceName" . }}
+          - --webhook-namespace={{ .Values.namespace | default .Release.Namespace }}
+          - --webhook-secret-name={{ .Values.webhook.secretName }}
+          - --webhook-mutating-name={{ include "cubrid-operator.fullname" . }}-webhook-mutating
+          - --webhook-validating-name={{ include "cubrid-operator.fullname" . }}-webhook-validating
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
         ports:
-        - containerPort: 4443
-          name: webhook
+        - name: webhook
+          containerPort: {{ .Values.webhook.ports.webhook }}
+        - name: probe
+          containerPort: {{ .Values.webhook.ports.probe }}
+        - name: metrics
+          containerPort: {{ .Values.webhook.ports.metrics }}
         volumeMounts:
-        - name: webhook-certs
-          mountPath: /tmp/k8s-webhook-server/serving-certs
+        - name: cert-dir
+          mountPath: {{ .Values.webhook.certDir }}
+          readOnly: false
+        {{- with .Values.webhook.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: probe
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: probe
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 60
+          timeoutSeconds: 1
+          failureThreshold: 1
+          successThreshold: 1
       volumes:
-      - name: webhook-certs
+      - name: cert-dir
         secret:
-          secretName: {{ include "cubrid-operator-webhook.secretName" . }}
+          secretName: {{ .Values.webhook.secretName }}
 {{- end }}

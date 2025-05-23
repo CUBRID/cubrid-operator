@@ -20,7 +20,10 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -39,6 +42,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	"github.com/cubrid/cubrid-operator/internal/controller"
+	"github.com/cubrid/cubrid-operator/pkg/certmanager"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -46,12 +50,26 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 
-	metricsAddr string
-	// webhookmetricsAddr   string
+	// Operator ports
+	operatorMetricsAddr  string
+	operatorProbeAddr    string
 	enableLeaderElection bool
-	probeAddr            string
 	secureMetrics        bool
 	enableHTTP2          bool
+
+	// Webhook ports
+	webhookMetricsAddr string
+	webhookProbeAddr   string
+	webhookPort        int
+
+	// Webhook configuration
+	webhookServiceName     string
+	webhookNamespace       string
+	webhookCertDir         string
+	webhookCertManagerType string
+	webhookSecretName      string
+	webhookMutatingName    string
+	webhookValidatingName  string
 )
 
 func init() {
@@ -61,15 +79,28 @@ func init() {
 	utilruntime.Must(cubridv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8180", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8181", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+	// Operator flags
+	rootCmd.PersistentFlags().StringVar(&operatorMetricsAddr, "metrics-bind-address", ":8080", "The address the operator metric endpoint binds to.")
+	rootCmd.PersistentFlags().StringVar(&operatorProbeAddr, "health-probe-bind-address", ":8081", "The address the operator probe endpoint binds to.")
+	rootCmd.PersistentFlags().BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", false,
+	rootCmd.PersistentFlags().BoolVar(&secureMetrics, "metrics-secure", false,
 		"If set the metrics endpoint is served securely")
-	flag.BoolVar(&enableHTTP2, "enable-http2", false,
+	rootCmd.PersistentFlags().BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+
+	// Webhook flags
+	webhookCmd.Flags().StringVar(&webhookMetricsAddr, "metrics-bind-address", ":8082", "The address the webhook metric endpoint binds to.")
+	webhookCmd.Flags().StringVar(&webhookProbeAddr, "health-probe-bind-address", ":8083", "The address the webhook probe endpoint binds to.")
+	webhookCmd.Flags().IntVar(&webhookPort, "webhook-port", 8443, "The port the webhook server serves on.")
+	webhookCmd.Flags().StringVar(&webhookServiceName, "webhook-service-name", "", "The name of the webhook service")
+	webhookCmd.Flags().StringVar(&webhookNamespace, "webhook-namespace", "cubrid", "The namespace where the webhook server is deployed")
+	webhookCmd.Flags().StringVar(&webhookCertDir, "webhook-cert-dir", certmanager.DefaultCertificateDir, "The directory where certificates are stored")
+	webhookCmd.Flags().StringVar(&webhookCertManagerType, "webhook-cert-manager-type", "internal", "The type of cert-manager to use (internal or external)")
+	webhookCmd.Flags().StringVar(&webhookSecretName, "webhook-secret-name", "", "The name of the secret used by the webhook server")
+	webhookCmd.Flags().StringVar(&webhookMutatingName, "webhook-mutating-name", "", "The name of the webhook mutating")
+	webhookCmd.Flags().StringVar(&webhookValidatingName, "webhook-validating-name", "", "The name of the webhook validating")
 }
 
 var rootCmd = &cobra.Command{
@@ -81,7 +112,6 @@ var rootCmd = &cobra.Command{
 			Development: true,
 		}
 		opts.BindFlags(flag.CommandLine)
-		flag.Parse()
 
 		// cwd, err := os.Getwd()
 		// if err != nil {
@@ -111,11 +141,11 @@ var rootCmd = &cobra.Command{
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme: scheme,
 			Metrics: metricsserver.Options{
-				BindAddress:   metricsAddr,
+				BindAddress:   operatorMetricsAddr,
 				SecureServing: secureMetrics,
 				TLSOpts:       tlsOpts,
 			},
-			HealthProbeBindAddress: probeAddr,
+			HealthProbeBindAddress: operatorProbeAddr,
 			LeaderElection:         enableLeaderElection,
 			LeaderElectionID:       "54dd1e7c.cubrid.com",
 			// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
@@ -173,10 +203,121 @@ var webhookCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		setupLog.Info("Starting webhook server!!")
 
-		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		// Create Kubernetes client
+		config := ctrl.GetConfigOrDie()
+
+		if webhookCertManagerType == "external" {
+			// When using external cert-manager, only check certificate path
+			setupLog.Info("External cert-manager")
+			if webhookCertDir == "" {
+				webhookCertDir = certmanager.DefaultCertificateDir
+			}
+
+			// Check if certificate files exist
+			certPath := filepath.Join(webhookCertDir, "tls.crt")
+			keyPath := filepath.Join(webhookCertDir, "tls.key")
+			if _, err := os.Stat(certPath); os.IsNotExist(err) {
+				setupLog.Error(err, "Certificate file not found", "path", certPath)
+				os.Exit(1)
+			}
+			if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+				setupLog.Error(err, "Key file not found", "path", keyPath)
+				os.Exit(1)
+			}
+		} else {
+			setupLog.Info("Internal cert-manager")
+			if webhookCertDir == "" {
+				setupLog.Info("Internal cert-manager: certDir is empty")
+				webhookCertDir = certmanager.DefaultCertificateDir
+			}
+
+			setupLog.Info("Webhook configuration",
+				"webhookServiceName", webhookServiceName,
+				"webhookNamespace", webhookNamespace,
+				"webhookCertDir", webhookCertDir,
+				"webhookCertManagerType", webhookCertManagerType,
+				"webhookSecretName", webhookSecretName,
+				"webhookPort", webhookPort,
+				"webhookMetricsAddr", webhookMetricsAddr,
+				"webhookProbeAddr", webhookProbeAddr)
+
+			// When using internal cert-manager, create and start cert-manager manager
+			certManager, err := certmanager.NewManager(config, certmanager.Config{
+				WebhookServiceName:     webhookServiceName,
+				WebhookNamespace:       webhookNamespace,
+				WebhookCertDir:         webhookCertDir,
+				WebhookCertManagerType: certmanager.CertManagerType(webhookCertManagerType),
+				WebhookSecretName:      webhookSecretName,
+				WebhookMutatingName:    webhookMutatingName,
+				WebhookValidatingName:  webhookValidatingName,
+			})
+			if err != nil {
+				setupLog.Error(err, "Unable to create cert-manager")
+				os.Exit(1)
+			}
+
+			// Start cert-manager
+			if err := certManager.Start(); err != nil {
+				setupLog.Error(err, "Unable to start cert-manager")
+				os.Exit(1)
+			}
+
+			certPath := filepath.Join(webhookCertDir, "tls.crt")
+			keyPath := filepath.Join(webhookCertDir, "tls.key")
+			caPath := filepath.Join(webhookCertDir, "ca.crt")
+
+			setupLog.Info("Waiting for certificates to be available...")
+			const maxRetries = 60
+			for i := 0; i < maxRetries; i++ {
+				if certInfo, err := os.Stat(certPath); err == nil {
+					if keyInfo, err := os.Stat(keyPath); err == nil {
+						if caInfo, err := os.Stat(caPath); err == nil {
+							if certInfo.Size() > 0 && keyInfo.Size() > 0 && caInfo.Size() > 0 {
+								setupLog.Info("All certificates are available and have content")
+								break
+							}
+						}
+					}
+				}
+				if i == maxRetries-1 {
+					setupLog.Error(nil, "Timeout waiting for certificates")
+					os.Exit(1)
+				}
+				setupLog.Info("Waiting for certificate content...")
+				time.Sleep(time.Second)
+			}
+
+			setupLog.Info("All certificates verified successfully")
+		}
+
+		// Configure to use certificates created by cert-manager
+		mgr, err := ctrl.NewManager(config, ctrl.Options{
+			HealthProbeBindAddress: webhookProbeAddr,
 			WebhookServer: webhook.NewServer(webhook.Options{
-				Port:    4443,
-				CertDir: "/tmp/k8s-webhook-server/serving-certs",
+				Port:    webhookPort,
+				CertDir: webhookCertDir,
+				TLSOpts: []func(*tls.Config){
+					func(cfg *tls.Config) {
+						// Check if certificate file exists
+						certPath := filepath.Join(webhookCertDir, "tls.crt")
+						if _, err := os.Stat(certPath); os.IsNotExist(err) {
+							setupLog.Error(err, "Certificate file not found", "path", certPath)
+							os.Exit(1)
+						}
+						keyPath := filepath.Join(webhookCertDir, "tls.key")
+						if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+							setupLog.Error(err, "Key file not found", "path", keyPath)
+							os.Exit(1)
+						}
+						// Load certificate
+						cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+						if err != nil {
+							setupLog.Error(err, "Failed to load certificate")
+							os.Exit(1)
+						}
+						cfg.Certificates = []tls.Certificate{cert}
+					},
+				},
 			}),
 		})
 		if err != nil {
@@ -199,12 +340,34 @@ var webhookCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// if err := mgr.AddReadyzCheck("certs", func(_ *http.Request) error {
-		// 	return checkCerts(dnsName, time.Now())
-		// }); err != nil {
-		// 	setupLog.Error(err, "Unable to add readyz check")
-		// 	os.Exit(1)
-		// }
+		if err := mgr.AddHealthzCheck("webhook-healthz", healthz.Ping); err != nil {
+			setupLog.Error(err, "unable to set up health check")
+			os.Exit(1)
+		}
+
+		// Add certificate check to readiness probe
+		if err := mgr.AddReadyzCheck("cert-check", func(_ *http.Request) error {
+			certPath := filepath.Join(webhookCertDir, "tls.crt")
+			if _, err := os.Stat(certPath); os.IsNotExist(err) {
+				return fmt.Errorf("certificate file not found: %s", certPath)
+			}
+
+			keyPath := filepath.Join(webhookCertDir, "tls.key")
+			if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+				return fmt.Errorf("key file not found: %s", keyPath)
+			}
+
+			caPath := filepath.Join(webhookCertDir, "ca.crt")
+			if _, err := os.Stat(caPath); os.IsNotExist(err) {
+				return fmt.Errorf("CA certificate file not found: %s", caPath)
+			}
+
+			setupLog.Info("successfully checked webhook-cert-check")
+			return nil
+		}); err != nil {
+			setupLog.Error(err, "Unable to add ready check")
+			os.Exit(1)
+		}
 
 		setupLog.Info("Starting manager")
 		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

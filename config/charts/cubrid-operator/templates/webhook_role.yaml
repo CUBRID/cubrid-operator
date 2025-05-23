@@ -72,4 +72,24 @@ rules:
   - get
   - list
   - watch  
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - update
+  - patch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - update
+  - patch
+  - list
+  - watch
 {{- end }}

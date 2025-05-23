@@ -1,4 +1,3 @@
-
 # common labels
 {{- define "common.labels" -}}
 app.kubernetes.io/name: {{ .Chart.Name }}
@@ -141,16 +140,7 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-# secret for webhook
-{{- define "cubrid-operator-webhook.secretName" -}}
-{{- if .Values.webhook.enabled }}
-{{- default (printf "%s-webhook-secret" (include "cubrid-operator.fullname" .))  .Values.webhook.secretName.name }}
-{{- else }}
-{{- default "default" .Values.webhook.secretName.name }}
-{{- end }}
-{{- end }}
-
 # service for webhook
 {{- define "cubrid-operator-webhook.serviceName" -}}
-cubrid-webhook-service
-{{- end }}
+{{- printf "%s-webhook-service" (include "cubrid-operator.fullname" .) -}}
+{{- end -}}

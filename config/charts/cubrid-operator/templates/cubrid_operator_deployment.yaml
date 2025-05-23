@@ -71,7 +71,8 @@ spec:
         - /manager
         args:
           #- "--leader-elect=true"
-        image: airnet73/operator:latest
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
@@ -81,15 +82,15 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8181
+            port: {{ .Values.operator.ports.probe }}
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8181
+            port: {{ .Values.operator.ports.probe }}
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 20
         # TODO(user): Configure the resources accordingly based on the project requirements.
         # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
         resources:

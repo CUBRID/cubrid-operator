@@ -60,7 +60,6 @@ const (
 	// user
 	CubridUser  = int64(1000)
 	CubridGroup = int64(1000)
-	RootUser    = int64(0)
 
 	HA_MASTER_SLAVE_TYPE = "master-slave"
 	HA_REPLICA_TYPE      = "replica"
