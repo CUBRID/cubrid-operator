@@ -54,8 +54,6 @@ var (
 	operatorMetricsAddr  string
 	operatorProbeAddr    string
 	enableLeaderElection bool
-	secureMetrics        bool
-	enableHTTP2          bool
 
 	// Webhook ports
 	webhookMetricsAddr string
@@ -86,10 +84,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	rootCmd.PersistentFlags().BoolVar(&secureMetrics, "metrics-secure", false,
-		"If set the metrics endpoint is served securely")
-	rootCmd.PersistentFlags().BoolVar(&enableHTTP2, "enable-http2", false,
-		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 
 	// Webhook flags
 	webhookCmd.Flags().StringVar(&webhookMetricsAddr, "metrics-bind-address", ":8082", "The address the webhook metric endpoint binds to.")
@@ -115,52 +109,14 @@ var rootCmd = &cobra.Command{
 		}
 		opts.BindFlags(flag.CommandLine)
 
-		// cwd, err := os.Getwd()
-		// if err != nil {
-		// 	fmt.Println("Error getting current working directory:", err)
-		// 	return
-		// }
-		// fmt.Println("Current working directory:", cwd)
-
-		// fmt.Println("=== leader-elect: ", enableLeaderElection)
-
-		// if the enable-http2 flag is false (the default), http/2 should be disabled
-		// due to its vulnerabilities. More specifically, disabling http/2 will
-		// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
-		// Rapid Reset CVEs. For more information see:
-		// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
-		// - https://github.com/advisories/GHSA-4374-p667-p6c8
-		disableHTTP2 := func(c *tls.Config) {
-			setupLog.Info("disabling http/2")
-			c.NextProtos = []string{"http/1.1"}
-		}
-
-		tlsOpts := []func(*tls.Config){}
-		if !enableHTTP2 {
-			tlsOpts = append(tlsOpts, disableHTTP2)
-		}
-
 		mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 			Scheme: scheme,
 			Metrics: metricsserver.Options{
-				BindAddress:   operatorMetricsAddr,
-				SecureServing: secureMetrics,
-				TLSOpts:       tlsOpts,
+				BindAddress: operatorMetricsAddr,
 			},
 			HealthProbeBindAddress: operatorProbeAddr,
 			LeaderElection:         enableLeaderElection,
 			LeaderElectionID:       "54dd1e7c.cubrid.com",
-			// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-			// when the Manager ends. This requires the binary to immediately end when the
-			// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-			// speeds up voluntary leader transitions as the new leader don't have to wait
-			// LeaseDuration time first.
-			//
-			// In the default scaffold provided, the program ends immediately after
-			// the manager stops, so would be fine to enable this option. However,
-			// if you are doing or is intended to do any operation such as perform cleanups
-			// after the manager stops then its usage might be unsafe.
-			// LeaderElectionReleaseOnCancel: true,
 		})
 		if err != nil {
 			setupLog.Error(err, "unable to start manager")
@@ -296,6 +252,9 @@ var webhookCmd = &cobra.Command{
 		// Configure to use certificates created by cert-manager
 		mgr, err := ctrl.NewManager(config, ctrl.Options{
 			HealthProbeBindAddress: webhookProbeAddr,
+			Metrics: metricsserver.Options{
+				BindAddress: webhookMetricsAddr,
+			},
 			WebhookServer: webhook.NewServer(webhook.Options{
 				Port:    webhookPort,
 				CertDir: webhookCertDir,
