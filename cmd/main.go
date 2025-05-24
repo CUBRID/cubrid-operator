@@ -70,6 +70,7 @@ var (
 	webhookSecretName      string
 	webhookMutatingName    string
 	webhookValidatingName  string
+	webhookDeploymentName  string
 )
 
 func init() {
@@ -101,6 +102,7 @@ func init() {
 	webhookCmd.Flags().StringVar(&webhookSecretName, "webhook-secret-name", "", "The name of the secret used by the webhook server")
 	webhookCmd.Flags().StringVar(&webhookMutatingName, "webhook-mutating-name", "", "The name of the webhook mutating")
 	webhookCmd.Flags().StringVar(&webhookValidatingName, "webhook-validating-name", "", "The name of the webhook validating")
+	webhookCmd.Flags().StringVar(&webhookDeploymentName, "webhook-deployment-name", "cubrid-operator-webhook-dep", "The name of the webhook deployment")
 }
 
 var rootCmd = &cobra.Command{
@@ -250,6 +252,7 @@ var webhookCmd = &cobra.Command{
 				WebhookSecretName:      webhookSecretName,
 				WebhookMutatingName:    webhookMutatingName,
 				WebhookValidatingName:  webhookValidatingName,
+				WebhookDeploymentName:  webhookDeploymentName,
 			})
 			if err != nil {
 				setupLog.Error(err, "Unable to create cert-manager")
@@ -346,7 +349,7 @@ var webhookCmd = &cobra.Command{
 		}
 
 		// Add certificate check to readiness probe
-		if err := mgr.AddReadyzCheck("cert-check", func(_ *http.Request) error {
+		if err := mgr.AddReadyzCheck("webhook-cert-check", func(_ *http.Request) error {
 			certPath := filepath.Join(webhookCertDir, "tls.crt")
 			if _, err := os.Stat(certPath); os.IsNotExist(err) {
 				return fmt.Errorf("certificate file not found: %s", certPath)

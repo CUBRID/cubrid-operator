@@ -12,10 +12,10 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
 	"time"
 
 	admissionv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,6 +68,8 @@ type Config struct {
 	CertData []byte
 	// KeyData is the PEM-encoded private key data
 	KeyData []byte
+	// WebhookDeploymentName is the name of the deployment to restart
+	WebhookDeploymentName string
 }
 
 // Manager handles certificate management
@@ -103,6 +105,9 @@ func NewManager(config *rest.Config, cfg Config) (*Manager, error) {
 	if cfg.WebhookValidatingName == "" {
 		cfg.WebhookValidatingName = "cubrid-operator-webhook-validating"
 	}
+	if cfg.WebhookDeploymentName == "" {
+		cfg.WebhookDeploymentName = "cubrid-operator-controller-manager"
+	}
 
 	return &Manager{
 		client: c,
@@ -115,6 +120,75 @@ func (m *Manager) GetCertDir() string {
 	return m.config.WebhookCertDir
 }
 
+// isPodReady checks if the pod is in ready state and is newly created
+func (m *Manager) isPodReady() (bool, error) {
+	logger := log.Log.WithName("cert-manager")
+
+	// Get pods owned by this deployment
+	podList := &corev1.PodList{}
+	err := m.client.List(context.Background(), podList, client.InNamespace(m.config.WebhookNamespace),
+		client.MatchingLabels(map[string]string{"app": m.config.WebhookDeploymentName}))
+	if err != nil {
+		return false, fmt.Errorf("failed to list pods: %v", err)
+	}
+
+	// If there's only one pod, no need to check readiness
+	if len(podList.Items) <= 1 {
+		logger.Info("Only one or no pods found, skipping readiness check")
+		return true, nil
+	}
+
+	// Find the newest pod
+	var newestPod *corev1.Pod
+	for _, pod := range podList.Items {
+		if newestPod == nil || pod.CreationTimestamp.After(newestPod.CreationTimestamp.Time) {
+			newestPod = &pod
+		}
+	}
+
+	if newestPod == nil {
+		return false, nil
+	}
+
+	// Check if the newest pod is ready
+	for _, condition := range newestPod.Status.Conditions {
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+			logger.Info("Newest pod is ready", "pod", newestPod.Name)
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// watchPodReady watches the pod readiness and updates CA Bundle when pod is ready
+func (m *Manager) watchPodReady() {
+	logger := log.Log.WithName("cert-manager")
+	logger.Info("Starting to watch pod readiness")
+
+	for {
+		ready, err := m.isPodReady()
+		if err != nil {
+			logger.Error(err, "Failed to check pod readiness")
+			time.Sleep(time.Second)
+			continue
+		}
+
+		if ready {
+			// Update caBundle in WebhookConfiguration
+			if err := m.updateWebhookConfiguration(); err != nil {
+				logger.Error(err, "Unable to update webhook configuration")
+				time.Sleep(time.Second)
+				continue
+			}
+			logger.Info("CA Bundle updated successfully")
+			return
+		}
+
+		time.Sleep(time.Second)
+	}
+}
+
 // Start starts the cert-manager manager
 func (m *Manager) Start() error {
 	logger := log.Log.WithName("cert-manager")
@@ -123,7 +197,7 @@ func (m *Manager) Start() error {
 		return fmt.Errorf("internal cert-manager should not be started when external cert-manager is selected")
 	}
 
-	// 1. Check existing certificates
+	//  Check existing certificates
 	secret := &corev1.Secret{}
 	err := m.client.Get(context.Background(), client.ObjectKey{
 		Namespace: m.config.WebhookNamespace,
@@ -132,9 +206,9 @@ func (m *Manager) Start() error {
 
 	if err == nil && secret != nil {
 		// If Secret exists, validate certificates
-		if certData, ok := secret.Data["tls.crt"]; ok {
-			if keyData, ok := secret.Data["tls.key"]; ok {
-				if caData, ok := secret.Data["ca.crt"]; ok {
+		if certData, ok := secret.Data["tls.crt"]; ok && len(certData) > 0 {
+			if keyData, ok := secret.Data["tls.key"]; ok && len(keyData) > 0 {
+				if caData, ok := secret.Data["ca.crt"]; ok && len(caData) > 0 {
 					// Validate certificates
 					if m.isValidCertificate(certData, keyData, caData) {
 						logger.Info("Valid existing certificates found in secret, skipping certificate creation")
@@ -143,11 +217,8 @@ func (m *Manager) Start() error {
 						m.config.CertData = certData
 						m.config.KeyData = keyData
 
-						// Only update caBundle in WebhookConfiguration
-						if err := m.updateWebhookConfiguration(); err != nil {
-							logger.Error(err, "Unable to update webhook configuration")
-							return err
-						}
+						// Start watching pod readiness in a separate goroutine
+						go m.watchPodReady()
 
 						// Start certificate monitoring
 						go m.watchCertificate()
@@ -158,26 +229,23 @@ func (m *Manager) Start() error {
 		}
 	}
 
-	// 2. If certificates do not exist or are invalid, create new ones
+	// If certificates do not exist or are invalid, create new ones
 	logger.Info("Creating new certificates")
 	if err := m.createSelfSignedCertificate(); err != nil {
 		logger.Error(err, "Unable to create self-signed certificate")
 		return err
 	}
 
-	// 3. Save the generated certificates to Secret
+	// Save the generated certificates to Secret
 	if err := m.saveCertificatesToSecret(); err != nil {
 		logger.Error(err, "Unable to save certificates to secret")
 		return err
 	}
 
-	// 4.Update caBundle in WebhookConfiguration
-	if err := m.updateWebhookConfiguration(); err != nil {
-		logger.Error(err, "Unable to update webhook configuration")
-		return err
-	}
+	// Start watching pod readiness in a separate goroutine
+	go m.watchPodReady()
 
-	// 5. Start certificate monitoring
+	// Start certificate monitoring
 	go m.watchCertificate()
 
 	return nil
@@ -403,69 +471,52 @@ func (m *Manager) updateWebhookConfiguration() error {
 	return nil
 }
 
-// certificatesExistAndValid checks if certificates exist and are valid
+// certificatesExistAndValid checks if certificates are valid based on expiration
 func (m *Manager) certificatesExistAndValid() (bool, error) {
-	certPath := filepath.Join(m.config.WebhookCertDir, "tls.crt")
-	keyPath := filepath.Join(m.config.WebhookCertDir, "tls.key")
-	caPath := filepath.Join(m.config.WebhookCertDir, "ca.crt")
+	logger := log.Log.WithName("cert-manager")
 
-	// Check if all certificate files exist
-	if _, err := os.Stat(certPath); os.IsNotExist(err) {
+	// Get certificate from secret
+	secret := &corev1.Secret{}
+	err := m.client.Get(context.Background(), client.ObjectKey{
+		Namespace: m.config.WebhookNamespace,
+		Name:      m.config.WebhookSecretName,
+	}, secret)
+	if err != nil {
+		logger.Error(err, "Failed to get secret")
+		return false, err
+	}
+
+	certData, ok := secret.Data["tls.crt"]
+	if !ok {
+		logger.Error(nil, "Certificate data not found in secret")
 		return false, nil
 	}
-	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+
+	certBlock, _ := pem.Decode(certData)
+	if certBlock == nil {
+		logger.Error(nil, "Failed to decode PEM certificate")
 		return false, nil
 	}
-	if _, err := os.Stat(caPath); os.IsNotExist(err) {
-		return false, nil
-	}
 
-	// Load certificate
-	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
-		return false, err
-	}
-
-	// Parse certificate
-	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return false, err
-	}
-
-	// Load CA certificate
-	caCertBytes, err := os.ReadFile(caPath)
-	if err != nil {
-		return false, err
-	}
-
-	// Parse CA certificate
-	caCert, err := x509.ParseCertificate(caCertBytes)
-	if err != nil {
-		return false, err
-	}
-
-	// Verify certificate chain
-	roots := x509.NewCertPool()
-	roots.AddCert(caCert)
-	_, err = x509Cert.Verify(x509.VerifyOptions{
-		Roots:       roots,
-		CurrentTime: time.Now(),
-	})
-	if err != nil {
+		logger.Error(err, "Failed to parse certificate")
 		return false, err
 	}
 
 	// Check if certificate is valid and not near expiration
 	now := time.Now()
 	if now.After(x509Cert.NotAfter) {
+		logger.Info("Certificate has expired", "notAfter", x509Cert.NotAfter)
 		return false, nil
 	}
 
-	// If certificate is within one month of expiration, consider it invalid
 	if time.Until(x509Cert.NotAfter) < oneMonth {
+		logger.Info("Certificate is near expiration", "notAfter", x509Cert.NotAfter, "timeUntil", time.Until(x509Cert.NotAfter))
 		return false, nil
 	}
 
+	logger.Info("Certificate is valid", "notAfter", x509Cert.NotAfter)
 	return true, nil
 }
 
@@ -515,13 +566,45 @@ func (m *Manager) watchCertificate() {
 		// Check if certificate needs renewal
 		exist, err := m.certificatesExistAndValid()
 		if err != nil {
-			logger.Error(err, "Unable to check certificate validity")
-			time.Sleep(oneHour)
-			continue
+			if errors.IsNotFound(err) {
+				// Secret not found, create new certificates
+				logger.Info("Secret not found, creating new certificates")
+				if err := m.createSelfSignedCertificate(); err != nil {
+					logger.Error(err, "Unable to create new certificate")
+					time.Sleep(oneHour)
+					continue
+				}
+
+				// Save to secret
+				if err := m.saveCertificatesToSecret(); err != nil {
+					logger.Error(err, "Unable to save certificates to secret")
+					time.Sleep(oneHour)
+					continue
+				}
+
+				// Note: This will be done after pod restart in the new pod
+				logger.Info("New certificates saved to secret, pod will be restarted to apply changes")
+
+				// Trigger pod restart
+				if err := m.restartPod(); err != nil {
+					logger.Error(err, "Unable to restart pod")
+					time.Sleep(oneHour)
+					continue
+				}
+
+				logger.Info("Triggered rolling update")
+				time.Sleep(oneHour)
+				continue
+			} else {
+				// Other errors, just log and continue
+				logger.Error(err, "Unable to check certificate validity")
+				time.Sleep(oneHour)
+				continue
+			}
 		}
 
 		if !exist {
-			// Create new certificate
+			// Certificate exists but needs renewal
 			if err := m.createSelfSignedCertificate(); err != nil {
 				logger.Error(err, "Unable to create new certificate")
 				time.Sleep(oneHour)
@@ -535,14 +618,50 @@ func (m *Manager) watchCertificate() {
 				continue
 			}
 
-			// Update webhook configuration
-			if err := m.updateWebhookConfiguration(); err != nil {
-				logger.Error(err, "Unable to update webhook configuration")
+			// Note: This will be done after pod restart in the new pod
+			logger.Info("New certificates saved to secret, pod will be restarted to apply changes")
+
+			// Trigger pod restart
+			if err := m.restartPod(); err != nil {
+				logger.Error(err, "Unable to restart pod")
 				time.Sleep(oneHour)
 				continue
 			}
+
+			logger.Info("Triggered rolling update")
+			time.Sleep(oneHour)
+			continue
 		}
 
 		time.Sleep(oneHour)
 	}
+}
+
+// restartPod restarts the pod by updating the deployment's annotation
+func (m *Manager) restartPod() error {
+	logger := log.Log.WithName("cert-manager")
+
+	// Get the deployment
+	deployment := &appsv1.Deployment{}
+	err := m.client.Get(context.Background(), client.ObjectKey{
+		Namespace: m.config.WebhookNamespace,
+		Name:      m.config.WebhookDeploymentName,
+	}, deployment)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment: %v", err)
+	}
+
+	// Update the deployment's annotation to trigger a restart
+	if deployment.Spec.Template.Annotations == nil {
+		deployment.Spec.Template.Annotations = make(map[string]string)
+	}
+	deployment.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+
+	// Update the deployment
+	if err := m.client.Update(context.Background(), deployment); err != nil {
+		return fmt.Errorf("failed to update deployment: %v", err)
+	}
+
+	logger.Info("Successfully triggered pod restart")
+	return nil
 }

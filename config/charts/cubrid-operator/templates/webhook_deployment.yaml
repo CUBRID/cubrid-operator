@@ -36,6 +36,7 @@ spec:
           - --webhook-secret-name={{ .Values.webhook.secretName }}
           - --webhook-mutating-name={{ include "cubrid-operator.fullname" . }}-webhook-mutating
           - --webhook-validating-name={{ include "cubrid-operator.fullname" . }}-webhook-validating
+          - --webhook-deployment-name={{ $fullName }}-webhook-dep
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
@@ -49,7 +50,7 @@ spec:
         volumeMounts:
         - name: cert-dir
           mountPath: {{ .Values.webhook.certDir }}
-          readOnly: false
+          readOnly: true
         {{- with .Values.webhook.resources }}
         resources:
           {{- toYaml . | nindent 12 }}

@@ -70,7 +70,6 @@ spec:
         - /manager
         args:
         - --leader-elect
-       # image: controller:latest
         image: airnet73/operator:latest
         name: manager
         securityContext:
