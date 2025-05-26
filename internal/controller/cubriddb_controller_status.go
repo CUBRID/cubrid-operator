@@ -12,7 +12,7 @@ import (
 	"time"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg"
+	cms "github.com/cubrid/cubrid-operator/pkg/cms"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	"github.com/cubrid/cubrid-operator/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -202,7 +202,7 @@ func parseHANodesStatus(result map[string]interface{}) ([]string, error) {
 func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string) (string, error) {
 	loginCmd := createLoginCommand(id, passwd, version)
 
-	resp, err := pkg.SendCommand(loginCmd, httpURL)
+	resp, err := cms.SendCommand(loginCmd, httpURL)
 	if err != nil {
 		return "", fmt.Errorf("error sending login command: %v", err)
 	}
@@ -242,7 +242,7 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 		return nil, fmt.Errorf("failed to create ha_status command: %v", err)
 	}
 
-	resp, err := pkg.SendCommand(command, httpURL)
+	resp, err := cms.SendCommand(command, httpURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send ha_status command: %v", err)
 	}
@@ -272,15 +272,15 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 	return responseMap, nil
 }
 
-func createLoginCommand(id, password, clientver string) *pkg.CMSCommand {
-	return pkg.CreateLoginCommand(id, password, clientver)
+func createLoginCommand(id, password, clientver string) *cms.CMSCommand {
+	return cms.CreateLoginCommand(id, password, clientver)
 }
 
-func createStatusCommand(token string) (*pkg.CMSCommand, error) {
+func createStatusCommand(token string) (*cms.CMSCommand, error) {
 	if token == "" {
 		return nil, fmt.Errorf("invalid empty token")
 	}
-	return pkg.CreateHAStatusCommand(token), nil
+	return cms.CreateHAStatusCommand(token), nil
 }
 
 func (r *CubridDBReconciler) getCredentialsFromSecret(ctx context.Context, secretName, namespace string) (string, string, string, error) {
