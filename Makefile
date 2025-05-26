@@ -76,14 +76,39 @@ $(CHARTS):
 	helm package $(CHARTS_DIR)/$@ --destination $(HELM_REPO_DIR)
 	@echo "$@ chart packaged successfully."
 
-# Create or Update Helm Repository Index
 .PHONY: helm-update-repo
 helm-update-repo: helm-package ## Create or Update Helm Repository Index
 	@echo "Updating Helm repository index..."
 	helm repo index $(HELM_REPO_DIR) --url $(HELM_REPO_URL)
 	@echo "Helm repository index updated successfully."
 
+.PHONY: helm-install
+helm-install: ## Install Helm Charts (cubrid-operator, cubrid-operator-crds)
+	@echo "Installing $(word 2,$(CHARTS)) chart..."
+	helm install $(word 2,$(CHARTS)) $(HELM_REPO_DIR)/$(word 2,$(CHARTS))-*.tgz
+	@echo "Installing $(word 1,$(CHARTS)) chart..."
+	helm install $(word 1,$(CHARTS)) $(HELM_REPO_DIR)/$(word 1,$(CHARTS))-*.tgz
+	@echo "Helm charts installed successfully."
 
+.PHONY: helm-uninstall
+helm-uninstall: ## Uninstall Helm Charts (cubrid-operator, cubrid-operator-crds)
+	@echo "Uninstalling $(word 1,$(CHARTS)) chart..."
+	helm uninstall $(word 1,$(CHARTS))
+	@echo "Uninstalling $(word 2,$(CHARTS)) chart..."
+	helm uninstall $(word 2,$(CHARTS))
+	@echo "Helm charts uninstalled successfully."
+
+.PHONY: helm-template
+helm-template: ## Render helm chart templates without installation
+	helm template $(word 1,$(CHARTS)) $(CHARTS_DIR)/$(word 1,$(CHARTS))
+
+.PHONY: helm-template-values
+helm-template-values: ## Render helm chart templates with values file. Usage: make helm-template-values VALUES_FILE=path/to/values.yaml
+	helm template $(word 1,$(CHARTS)) $(CHARTS_DIR)/$(word 1,$(CHARTS)) -f $(if $(VALUES_FILE),$(VALUES_FILE),$(CHARTS_DIR)/$(word 1,$(CHARTS))/values.yaml)
+
+.PHONY: helm-template-debug
+helm-template-debug: ## Render helm chart templates in debug mode
+	helm template $(word 1,$(CHARTS)) $(CHARTS_DIR)/$(word 1,$(CHARTS)) --debug
 
 ##@ Development
 
