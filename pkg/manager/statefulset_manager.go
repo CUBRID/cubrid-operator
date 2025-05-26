@@ -12,9 +12,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	meta "github.com/cubrid/cubrid-operator/pkg/meta"
 	"github.com/cubrid/cubrid-operator/pkg/rbac"
+	res "github.com/cubrid/cubrid-operator/pkg/resources"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
@@ -52,19 +53,19 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 	stslogger.V(1).Info("Handling StatefulSet for CubridDB")
 
 	var replicaNum int32 = 1
-	serviceName := pkg.CreateHeadlessServiceName(cubridDB.Name)
+	serviceName := res.CreateHeadlessServiceName(cubridDB.Name)
 
 	if cubridDB.Spec.Replication.Enable {
 		replicaNum = cubridDB.Spec.Replication.Replicas
 	}
 
-	copyConfVolumeMountSpecs := []pkg.VolumeMountConfig{
+	copyConfVolumeMountSpecs := []res.VolumeMountConfig{
 		{Name: DEF.ConfBackupVolumeName, MountPath: DEF.ConfBackupMountPath},
 		{Name: DEF.LogsBackupVolumeName, MountPath: DEF.LogsBackupMountPath},
 		{Name: DEF.DBBackupVolumeName, MountPath: DEF.DBBackupMountPath},
 	}
 
-	recoveryConfVolumeMountSpecs := []pkg.VolumeMountConfig{
+	recoveryConfVolumeMountSpecs := []res.VolumeMountConfig{
 		{Name: DEF.ConfStorageVolumeName, MountPath: DEF.ConfMountPath},
 		{Name: DEF.DatabaseStorageVolumeName, MountPath: DEF.DatabaseMountPath},
 		{Name: DEF.BackupDBStorageVolumeName, MountPath: DEF.BackupDBMountPath},
@@ -73,14 +74,14 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 		{Name: DEF.LogsBackupVolumeName, MountPath: DEF.LogsBackupMountPath},
 	}
 
-	initContainers := pkg.CreateInitContainers(cubridDB, copyConfVolumeMountSpecs, recoveryConfVolumeMountSpecs)
+	initContainers := res.CreateInitContainers(cubridDB, copyConfVolumeMountSpecs, recoveryConfVolumeMountSpecs)
 
 	containers := []corev1.Container{
-		pkg.CreateContainers(cubridDB.Name,
+		res.CreateContainers(cubridDB.Name,
 			cubridDB.Spec.Image,
-			pkg.ConfigureSecurityContext(DEF.CubridUser, DEF.CubridGroup),
-			pkg.CreateContainerPorts(ctx, cubridDB),
-			pkg.CreateVolumeMountsForCubridDB(cubridDB)),
+			res.ConfigureSecurityContext(DEF.CubridUser, DEF.CubridGroup),
+			res.CreateContainerPorts(ctx, cubridDB),
+			res.CreateVolumeMountsForCubridDB(cubridDB)),
 	}
 
 	volumes := []corev1.Volume{
@@ -122,23 +123,23 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 		return fmt.Errorf("error reconciling RBAC resources: %v", err)
 	}
 
-	podTemplateSpec := pkg.CreatePodTemplateSpec(
-		pkg.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
+	podTemplateSpec := res.CreatePodTemplateSpec(
+		meta.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
 		initContainers,
 		containers,
-		pkg.CreatePodSecurityContext(DEF.CubridUser, DEF.CubridGroup),
+		res.CreatePodSecurityContext(DEF.CubridUser, DEF.CubridGroup),
 		volumes,
-		pkg.CreateAffinity(cubridDB),
+		res.CreateAffinity(cubridDB),
 		serviceAccountName,
 	)
 
-	volumeClaimTemplates, err := pkg.NewPersistentVolumeClaims(cubridDB)
+	volumeClaimTemplates, err := res.NewPersistentVolumeClaims(cubridDB)
 	if err != nil {
 		return fmt.Errorf("error createing PVCs: %v", err)
 	}
 
 	// Create the StatefulSet
-	desiredSTS := pkg.CreateStatefulSet(
+	desiredSTS := res.CreateStatefulSet(
 		cubridDB, initContainers, containers, serviceName, replicaNum, podTemplateSpec, volumeClaimTemplates)
 
 	if err := controllerutil.SetControllerReference(cubridDB, desiredSTS, r.Scheme); err != nil {
@@ -179,7 +180,7 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 				return fmt.Errorf("error updating CR replicas from StatefulSet scale: %v", err)
 			}
 
-			if err := pkg.UpdateLastReplicasAnnotation(ctx, r.Client, &existingSts, currentReplicas); err != nil {
+			if err := meta.UpdateLastReplicasAnnotation(ctx, r.Client, &existingSts, currentReplicas); err != nil {
 				return fmt.Errorf("error updating StatefulSet annotation(LastReplicas): %v", err)
 			}
 

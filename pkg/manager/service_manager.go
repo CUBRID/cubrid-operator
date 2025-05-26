@@ -14,8 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
-	"github.com/cubrid/cubrid-operator/pkg"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	res "github.com/cubrid/cubrid-operator/pkg/resources"
 	"github.com/cubrid/cubrid-operator/pkg/util"
 )
 
@@ -72,7 +72,7 @@ func (m *ServiceManager) reconcileHeadlessService(ctx context.Context, cubridDB 
 	svclogger.V(1).Info("Start reconcileHeadlessService()")
 	// Define service ports for headless service (HA port only)
 	ports := []corev1.ServicePort{
-		pkg.CreateServicePort(
+		res.CreateServicePort(
 			DEF.SVC_HEADLESS_PORT_NAME,
 			DEF.SVC_HA_PORT_ID,
 			DEF.SVC_HA_PORT_ID,
@@ -82,17 +82,17 @@ func (m *ServiceManager) reconcileHeadlessService(ctx context.Context, cubridDB 
 	}
 
 	// Create service metadata
-	meta := pkg.CreateServiceMeta(
-		pkg.CreateHeadlessServiceName(cubridDB.Name),
+	meta := res.CreateServiceMeta(
+		res.CreateHeadlessServiceName(cubridDB.Name),
 		cubridDB.Namespace,
-		pkg.CreateServiceLabels(cubridDB.Name, DEF.SVC_NAME_SUFFIX, nil),
+		res.CreateServiceLabels(cubridDB.Name, DEF.SVC_NAME_SUFFIX, nil),
 	)
 
 	// Create service spec
-	spec := pkg.CreateServiceSpec(
+	spec := res.CreateServiceSpec(
 		corev1.ServiceTypeClusterIP,
 		ports,
-		pkg.CreateHeadlessServiceSelector(cubridDB.Name),
+		res.CreateHeadlessServiceSelector(cubridDB.Name),
 	)
 
 	// Create headless service
@@ -118,7 +118,7 @@ func (m *ServiceManager) reconcileHeadlessService(ctx context.Context, cubridDB 
 // reconcileCMSServices manages CMS NodePort services
 func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	if !isCMSEnabled(cubridDB) {
-		return m.cleanupServices(ctx, cubridDB, pkg.ServiceTypeCMS)
+		return m.cleanupServices(ctx, cubridDB, res.ServiceTypeCMS)
 	}
 
 	// Get the initial start port once
@@ -126,7 +126,7 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 	cmsPort := getCMSPort(cubridDB)
 
 	// Validate the initial start port
-	if err := pkg.ValidateNodePort(startNodePort); err != nil {
+	if err := res.ValidateNodePort(startNodePort); err != nil {
 		return fmt.Errorf("invalid initial CMS start port: %v", err)
 	}
 
@@ -165,14 +165,14 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 			return fmt.Errorf("error checking existing service %s: %v", serviceName, err)
 		} else {
 			// Service doesn't exist, check if the port is available
-			inUse, err := pkg.IsPortInUse(ctx, m.Client, startNodePort, serviceName)
+			inUse, err := res.IsPortInUse(ctx, m.Client, startNodePort, serviceName)
 			if err != nil {
 				return fmt.Errorf("error checking port availability for CMS service %s: %v", serviceName, err)
 			}
 
 			// If port is in use, find the next available port
 			if inUse {
-				startNodePort, err = pkg.FindNextAvailablePort(ctx, m.Client, startNodePort, serviceName)
+				startNodePort, err = res.FindNextAvailablePort(ctx, m.Client, startNodePort, serviceName)
 				if err != nil {
 					return fmt.Errorf("error finding available port for CMS service %s: %v", serviceName, err)
 				}
@@ -181,7 +181,7 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 
 		// Create service ports
 		ports := []corev1.ServicePort{
-			pkg.CreateServicePort(
+			res.CreateServicePort(
 				"cms",
 				cmsPort,
 				cmsPort,
@@ -192,15 +192,15 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 
 		// Create service
 		service := &corev1.Service{
-			ObjectMeta: pkg.CreateServiceMeta(
+			ObjectMeta: res.CreateServiceMeta(
 				serviceName,
 				cubridDB.Namespace,
-				pkg.CreateServiceLabels(cubridDB.Name, pkg.ServiceTypeCMS, nil),
+				res.CreateServiceLabels(cubridDB.Name, res.ServiceTypeCMS, nil),
 			),
-			Spec: pkg.CreateServiceSpec(
+			Spec: res.CreateServiceSpec(
 				corev1.ServiceTypeNodePort,
 				ports,
-				pkg.CreateCMSSelector(podName),
+				res.CreateCMSSelector(podName),
 			),
 		}
 
@@ -222,7 +222,7 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 // reconcileBrokerServices manages Broker services
 func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	if len(cubridDB.Spec.Broker) == 0 {
-		return m.cleanupServices(ctx, cubridDB, pkg.ServiceTypeBroker)
+		return m.cleanupServices(ctx, cubridDB, res.ServiceTypeBroker)
 	}
 
 	for _, broker := range cubridDB.Spec.Broker {
@@ -231,23 +231,23 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 		}
 
 		// Create service port
-		servicePort := pkg.CreateServicePort(broker.Name, broker.Port, broker.Port, broker.ServicePort, corev1.ProtocolTCP)
+		servicePort := res.CreateServicePort(broker.Name, broker.Port, broker.Port, broker.ServicePort, corev1.ProtocolTCP)
 
 		// Create service
 		svc := &corev1.Service{
-			ObjectMeta: pkg.CreateServiceMeta(
+			ObjectMeta: res.CreateServiceMeta(
 				broker.Name,
 				cubridDB.Namespace,
-				pkg.CreateServiceLabels(
+				res.CreateServiceLabels(
 					cubridDB.Name,
-					pkg.ServiceTypeBroker,
+					res.ServiceTypeBroker,
 					map[string]string{"broker": broker.Name},
 				),
 			),
-			Spec: pkg.CreateServiceSpec(
+			Spec: res.CreateServiceSpec(
 				broker.ServiceType,
 				[]corev1.ServicePort{servicePort},
-				pkg.CreateBrokerSelector(cubridDB.Name),
+				res.CreateBrokerSelector(cubridDB.Name),
 			),
 		}
 
@@ -302,7 +302,7 @@ func (m *ServiceManager) createOrUpdateService(ctx context.Context, svc *corev1.
 	return nil
 }
 
-func (m *ServiceManager) cleanupServices(ctx context.Context, cubridDB *cubridv1.CubridDB, serviceType pkg.ServiceType) error {
+func (m *ServiceManager) cleanupServices(ctx context.Context, cubridDB *cubridv1.CubridDB, serviceType res.ServiceType) error {
 	services := &corev1.ServiceList{}
 	if err := m.List(ctx, services,
 		client.InNamespace(cubridDB.Namespace),

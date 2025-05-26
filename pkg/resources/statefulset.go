@@ -5,6 +5,7 @@ import (
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	meta "github.com/cubrid/cubrid-operator/pkg/meta"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -31,9 +32,9 @@ func CreateStatefulSet(
 	annotations := map[string]string{"lastReplicas": strconv.Itoa(int(replicaNum))}
 
 	return &appsv1.StatefulSet{
-		ObjectMeta: NewObjectMeta(cubridDB.Name, cubridDB.Namespace, labels, annotations),
+		ObjectMeta: meta.NewObjectMeta(cubridDB.Name, cubridDB.Namespace, labels, annotations),
 		Spec: appsv1.StatefulSetSpec{
-			Selector:             NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
+			Selector:             meta.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
 			ServiceName:          serviceName,
 			Replicas:             &replicaNum,
 			UpdateStrategy:       statefulSetUpdateStrategy(cubridDB.Spec.UpdateStrategy),

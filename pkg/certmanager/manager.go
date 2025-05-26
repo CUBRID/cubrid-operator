@@ -26,10 +26,9 @@ import (
 
 const (
 	// Certificate validity periods
-	oneYear  = 365 * 24 * time.Hour
-	oneMonth = 30 * 24 * time.Hour
-	oneDay   = 24 * time.Hour
-	oneHour  = time.Hour
+	oneYear  = 365 * 24 * time.Hour // 7 * time.Minute
+	oneMonth = 30 * 24 * time.Hour  // 5 * time.Minute
+	oneHour  = time.Hour            // 1 * time.Minute
 
 	// DefaultCertificateDir is the default directory for storing certificates
 	DefaultCertificateDir = "/tmp/k8s-webhook-server/serving-certs"
