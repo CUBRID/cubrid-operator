@@ -52,7 +52,6 @@ type Config struct {
 	WebhookNamespace string
 	// WebhookMutatingName is the name of the MutatingWebhookConfiguration
 	WebhookMutatingName string
-
 	// WebhookValidatingName is the name of the ValidatingWebhookConfiguration
 	WebhookValidatingName string
 	// WebhookCertDir is the directory where certificates are stored
