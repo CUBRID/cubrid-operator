@@ -168,11 +168,19 @@ run-webhook: manifests generate fmt vet ## Run a webhook server from your host.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager. Usage: make docker-build [IMAGE=<registry/image:tag>]
+docker-build: ## Build docker image with the manager. Usage: make docker-build [registry/image:tag] [PLATFORM=linux/arm64]
 	@if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		$(CONTAINER_TOOL) build -t $(filter-out $@,$(MAKECMDGOALS)) . ; \
+		if [ -n "$(PLATFORM)" ]; then \
+			$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(filter-out $@,$(MAKECMDGOALS)) . ; \
+		else \
+			$(CONTAINER_TOOL) build -t $(filter-out $@,$(MAKECMDGOALS)) . ; \
+		fi \
 	else \
-		$(CONTAINER_TOOL) build -t ${IMG} . ; \
+		if [ -n "$(PLATFORM)" ]; then \
+			$(CONTAINER_TOOL) build --platform $(PLATFORM) -t ${IMG} . ; \
+		else \
+			$(CONTAINER_TOOL) build -t ${IMG} . ; \
+		fi \
 	fi
 
 .PHONY: docker-images
@@ -181,7 +189,7 @@ docker-images: ## List all docker images
 	@$(CONTAINER_TOOL) images
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager. Usage: make docker-push [IMAGE=<registry/image:tag>]
+docker-push: ## Push docker image with the manager. Usage: make docker-push [registry/image:tag]
 	@if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
 		$(CONTAINER_TOOL) push $(filter-out $@,$(MAKECMDGOALS)) ; \
 	else \
