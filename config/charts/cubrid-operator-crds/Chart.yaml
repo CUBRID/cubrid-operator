@@ -3,12 +3,13 @@ name: cubrid-operator-crds
 description: cubrid-operator CRDs
 home: https://github.com/CUBRID/cubrid-operator
 type: application
-version: 0.0.1
-appVersion: "0.0.1"
-kubeVersion: ">=1.30.0-0"
+version: 0.0.1  # helm chart version
+appVersion: "0.0.1" # cubrid operator version
+kubeVersion: ">=1.29.0-0" # kubernetes version
 maintainers:
-  - email: airnet@cubrid.com
-    name: Dooho Kang
+  - email: airnet@cubrid.com # maintainer email
+    name: Dooho Kang # maintainer name
+
 keywords:
   - cubrid
   - cubrid HA
