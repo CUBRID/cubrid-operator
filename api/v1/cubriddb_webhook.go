@@ -115,20 +115,20 @@ func (c *CubridDB) validateCubridDBByRefName() error {
 		return nil
 	}
 
-	// Replica type 인 경우, CubridRef.Name 이 있는지 체크한다.
+	// Check if CubridRef.Name exists for Replica type
 	refName := c.Spec.Replication.HAmodeType.CubridRef.Name
 	if c.HAmodeType() == DEF.HA_REPLICA_TYPE && c.Spec.Replication.HAmodeType.CubridRef.Name == "" {
-		// ref.name이 없으면 오류를 반환합니다.
+		// Return error if ref.name is not specified
 		return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
 			field.Invalid(field.NewPath("Spec").Child("Replication").Child("HAmodeType").Child("CubridRef").Child("Name"),
 				refName, "CubridRef.Name must be specified"),
 		})
 	}
 
-	// Replica type인 경우, Replica에서 참조 하는 Master-Slave type이 중복되면 안된다.
-	// Replica에서 참조하는 Master-Slae 중복되는지 체크한다.
+	// For Replica type, check if the referenced Master-Slave is not duplicated
+	// Check if the Master-Slave referenced by Replica is duplicated
 	if c.HAmodeType() == DEF.HA_REPLICA_TYPE {
-		existingCubridDBList := &CubridDBList{} // CubridDBList를 사용하여 다수의 CubridDB 리소스를 찾습니다.
+		existingCubridDBList := &CubridDBList{} // Use CubridDBList to find multiple CubridDB resources
 		err := cubClient.List(context.Background(), existingCubridDBList, &client.ListOptions{
 			Namespace: c.Namespace,
 		})
