@@ -21,8 +21,6 @@ spec:
         control-plane: controller-manager  
     spec:
       serviceAccountName: {{ include "cubrid-operator-webhook.serviceAccountName" . }}
-      securityContext:
-        fsGroup: 1000
       containers:
       - name: {{ $fullName }}-webhook-dep
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -37,9 +35,6 @@ spec:
           - --webhook-mutating-name={{ include "cubrid-operator.fullname" . }}-webhook-mutating
           - --webhook-validating-name={{ include "cubrid-operator.fullname" . }}-webhook-validating
           - --webhook-deployment-name={{ $fullName }}-webhook-dep
-        securityContext:
-          runAsUser: 1000
-          runAsGroup: 1000
         ports:
         - name: webhook
           containerPort: {{ .Values.webhook.ports.webhook }}
