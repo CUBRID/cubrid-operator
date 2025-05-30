@@ -50,17 +50,15 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 
-	// Operator ports
+	// Operator flags
 	operatorMetricsAddr  string
 	operatorProbeAddr    string
 	enableLeaderElection bool
 
-	// Webhook ports
-	webhookMetricsAddr string
-	webhookProbeAddr   string
-	webhookPort        int
-
-	// Webhook configuration
+	// Webhook flags
+	webhookMetricsAddr     string
+	webhookProbeAddr       string
+	webhookPort            int
 	webhookServiceName     string
 	webhookNamespace       string
 	webhookCertDir         string
