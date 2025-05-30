@@ -18,9 +18,11 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -77,6 +79,7 @@ func (c *CubridDB) ValidateCreate() (admission.Warnings, error) {
 		c.validateHA,
 		c.validateCubridDBByRefName,
 		c.validateCMSService,
+		c.validateBrokerServicePort,
 	}
 
 	for _, fn := range validateFns {
@@ -84,31 +87,6 @@ func (c *CubridDB) ValidateCreate() (admission.Warnings, error) {
 			return nil, err
 		}
 	}
-	return nil, nil
-}
-
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (c *CubridDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	cubriddblog.Info("validate update", "name", c.Name)
-
-	validateFns := []func() error{
-		func() error { return c.validateUpdateHA(old) },
-		func() error { return c.validateUpdateStorages(old) },
-	}
-
-	for _, fn := range validateFns {
-		if err := fn(); err != nil {
-			return nil, err
-		}
-	}
-	return nil, nil
-}
-
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (c *CubridDB) ValidateDelete() (admission.Warnings, error) {
-	cubriddblog.Info("validate delete", "name", c.Name)
-
-	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil
 }
 
@@ -128,6 +106,108 @@ func (c *CubridDB) validateHA() error {
 	}
 
 	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
+}
+
+func (c *CubridDB) validateCubridDBByRefName() error {
+	cubriddblog.Info("validateCubridDBByRefName", "name", c.Name)
+
+	if !c.Replication().Enable {
+		return nil
+	}
+
+	// Replica type 인 경우, CubridRef.Name 이 있는지 체크한다.
+	refName := c.Spec.Replication.HAmodeType.CubridRef.Name
+	if c.HAmodeType() == DEF.HA_REPLICA_TYPE && c.Spec.Replication.HAmodeType.CubridRef.Name == "" {
+		// ref.name이 없으면 오류를 반환합니다.
+		return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
+			field.Invalid(field.NewPath("Spec").Child("Replication").Child("HAmodeType").Child("CubridRef").Child("Name"),
+				refName, "CubridRef.Name must be specified"),
+		})
+	}
+
+	// Replica type인 경우, Replica에서 참조 하는 Master-Slave type이 중복되면 안된다.
+	// Replica에서 참조하는 Master-Slae 중복되는지 체크한다.
+	if c.HAmodeType() == DEF.HA_REPLICA_TYPE {
+		existingCubridDBList := &CubridDBList{} // CubridDBList를 사용하여 다수의 CubridDB 리소스를 찾습니다.
+		err := cubClient.List(context.Background(), existingCubridDBList, &client.ListOptions{
+			Namespace: c.Namespace,
+		})
+
+		if err != nil {
+			return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
+				field.Invalid(field.NewPath("Spec").Child("Replication").Child("HAmodeType").Child("CubridRef").Child("Name"),
+					refName, err.Error()),
+			})
+		}
+
+		for _, existingCubridDB := range existingCubridDBList.Items {
+			cubriddblog.Info("findCubridDBByRefName", "cubriddb name", existingCubridDB.Name, "CubridRef Name", existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name)
+			if existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name == refName {
+				return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("replication").Child("cubridRef").Child("name"), refName, "Master-Slave is already referenced by another Replica."),
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *CubridDB) validateCMSService() error {
+	cubriddblog.Info("validateCMSService", "name", c.Name)
+
+	var allErrs field.ErrorList
+
+	if c.Spec.CMSService != nil && c.Spec.CMSService.Enabled != nil && *c.Spec.CMSService.Enabled {
+		if c.Spec.CMSService.StartPort != nil {
+			if *c.Spec.CMSService.StartPort < 30000 || *c.Spec.CMSService.StartPort > 32767 {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "cmsService", "startPort"),
+					*c.Spec.CMSService.StartPort,
+					"startPort must be between 30000 and 32767 (NodePort range)",
+				))
+			}
+		}
+
+		if c.Spec.CMSService.Port != nil {
+			if *c.Spec.CMSService.Port < 1 || *c.Spec.CMSService.Port > 65535 {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "cmsService", "port"),
+					*c.Spec.CMSService.Port,
+					"port must be between 1 and 65535",
+				))
+			}
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+
+	return apierrors.NewInvalid(
+		schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"},
+		c.Name,
+		allErrs,
+	)
+}
+
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+func (c *CubridDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+	cubriddblog.Info("validate update", "name", c.Name)
+
+	validateFns := []func() error{
+		func() error { return c.validateUpdateHA(old) },
+		func() error { return c.validateUpdateStorages(old) },
+		func() error { return c.validateUpdateStartPort(old) },
+		func() error { return c.validateBrokerServicePort() },
+	}
+
+	for _, fn := range validateFns {
+		if err := fn(); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
 }
 
 func (c *CubridDB) validateUpdateHA(old runtime.Object) error {
@@ -212,6 +292,62 @@ func (c *CubridDB) validateUpdateStorages(old runtime.Object) error {
 	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
 }
 
+// validateUpdateStartPort checks if the CMS StartPort has been changed
+func (c *CubridDB) validateUpdateStartPort(old runtime.Object) error {
+	cubriddblog.Info("validateUpdateStartPort", "name", c.Name)
+	var allErrs field.ErrorList
+
+	oldCubridDB := old.(*CubridDB)
+
+	// Check if both old and new have CMSService configured
+	if oldCubridDB.Spec.CMSService != nil && c.Spec.CMSService != nil {
+		// If both have StartPort configured, check if they are different
+		if oldCubridDB.Spec.CMSService.StartPort != nil && c.Spec.CMSService.StartPort != nil {
+			if *oldCubridDB.Spec.CMSService.StartPort != *c.Spec.CMSService.StartPort {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec").Child("cmsService").Child("startPort"),
+					*c.Spec.CMSService.StartPort,
+					fmt.Sprintf("CMS StartPort cannot be changed after initial creation. Current port: %d", *oldCubridDB.Spec.CMSService.StartPort)))
+			}
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
+}
+
+// validateBrokerServicePort checks if the Broker ServicePort is within the valid NodePort range
+func (c *CubridDB) validateBrokerServicePort() error {
+	cubriddblog.Info("validateBrokerServicePort", "name", c.Name)
+	var allErrs field.ErrorList
+
+	for i, broker := range c.Spec.Broker {
+		if broker.ServiceType == corev1.ServiceTypeNodePort && broker.ServicePort != 0 {
+			if broker.ServicePort < 30000 || broker.ServicePort > 32767 {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec").Child("broker").Index(i).Child("servicePort"),
+					broker.ServicePort,
+					"servicePort must be between 30000 and 32767 (NodePort range)"))
+			}
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
+}
+
+// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
+func (c *CubridDB) ValidateDelete() (admission.Warnings, error) {
+	cubriddblog.Info("validate delete", "name", c.Name)
+
+	// TODO(user): fill in your validation logic upon object deletion.
+	return nil, nil
+}
+
 func storagesAreEqual(newStorages, oldStorages []Storage) bool {
 	cubriddblog.Info("storagesAreEqual")
 	if len(newStorages) != len(oldStorages) {
@@ -225,89 +361,6 @@ func storagesAreEqual(newStorages, oldStorages []Storage) bool {
 	}
 
 	return true
-}
-
-func (c *CubridDB) validateCubridDBByRefName() error {
-	cubriddblog.Info("validateCubridDBByRefName", "name", c.Name)
-
-	if !c.Replication().Enable {
-		return nil
-	}
-
-	// Replica type 인 경우, CubridRef.Name 이 있는지 체크한다.
-	refName := c.Spec.Replication.HAmodeType.CubridRef.Name
-	if c.HAmodeType() == DEF.HA_REPLICA_TYPE && c.Spec.Replication.HAmodeType.CubridRef.Name == "" {
-		// ref.name이 없으면 오류를 반환합니다.
-		return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
-			field.Invalid(field.NewPath("Spec").Child("Replication").Child("HAmodeType").Child("CubridRef").Child("Name"),
-				refName, "CubridRef.Name must be specified"),
-		})
-	}
-
-	// Replica type인 경우, Replica에서 참조 하는 Master-Slave type이 중복되면 안된다.
-	// Replica에서 참조하는 Master-Slae 중복되는지 체크한다.
-	if c.HAmodeType() == DEF.HA_REPLICA_TYPE {
-		existingCubridDBList := &CubridDBList{} // CubridDBList를 사용하여 다수의 CubridDB 리소스를 찾습니다.
-		err := cubClient.List(context.Background(), existingCubridDBList, &client.ListOptions{
-			Namespace: c.Namespace,
-		})
-
-		if err != nil {
-			return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
-				field.Invalid(field.NewPath("Spec").Child("Replication").Child("HAmodeType").Child("CubridRef").Child("Name"),
-					refName, err.Error()),
-			})
-		}
-
-		for _, existingCubridDB := range existingCubridDBList.Items {
-			cubriddblog.Info("findCubridDBByRefName", "cubriddb name", existingCubridDB.Name, "CubridRef Name", existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name)
-			if existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name == refName {
-				return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
-					field.Invalid(field.NewPath("spec").Child("replication").Child("cubridRef").Child("name"), refName, "Master-Slave is already referenced by another Replica."),
-				})
-			}
-		}
-	}
-
-	return nil
-}
-
-func (c *CubridDB) validateCMSService() error {
-	cubriddblog.Info("validateCMSService", "name", c.Name)
-
-	var allErrs field.ErrorList
-
-	if c.Spec.CMSService != nil && c.Spec.CMSService.Enabled != nil && *c.Spec.CMSService.Enabled {
-		if c.Spec.CMSService.StartPort != nil {
-			if *c.Spec.CMSService.StartPort < 30000 || *c.Spec.CMSService.StartPort > 32767 {
-				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spec", "cmsService", "startPort"),
-					*c.Spec.CMSService.StartPort,
-					"startPort must be between 30000 and 32767 (NodePort range)",
-				))
-			}
-		}
-
-		if c.Spec.CMSService.Port != nil {
-			if *c.Spec.CMSService.Port < 1 || *c.Spec.CMSService.Port > 65535 {
-				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spec", "cmsService", "port"),
-					*c.Spec.CMSService.Port,
-					"port must be between 1 and 65535",
-				))
-			}
-		}
-	}
-
-	if len(allErrs) == 0 {
-		return nil
-	}
-
-	return apierrors.NewInvalid(
-		schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"},
-		c.Name,
-		allErrs,
-	)
 }
 
 func (c *CubridDB) initImage() {
