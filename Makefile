@@ -59,6 +59,8 @@ CHARTS := cubrid-operator cubrid-operator-crds
 $(HELM_REPO_DIR):
 	@mkdir -p $(HELM_REPO_DIR)
 
+# Get version from Chart.yaml
+VERSION := $(shell grep '^version:' $(HELM_REPO_DIR)/cubrid-operator/Chart.yaml | cut -d' ' -f2)
 
 # helm-crds 
 .PHONY: helm-crd
@@ -85,9 +87,9 @@ helm-update-repo: helm-package ## Create or Update Helm Repository Index
 .PHONY: helm-install
 helm-install: ## Install Helm Charts (cubrid-operator, cubrid-operator-crds)
 	@echo "Installing $(word 2,$(CHARTS)) chart..."
-	helm install $(word 2,$(CHARTS)) $(HELM_REPO_DIR)/$(word 2,$(CHARTS))-*.tgz
+	helm install $(word 2,$(CHARTS)) $(HELM_REPO_DIR)/$(word 2,$(CHARTS))-$(VERSION).tgz
 	@echo "Installing $(word 1,$(CHARTS)) chart..."
-	helm install $(word 1,$(CHARTS)) $(HELM_REPO_DIR)/$(word 1,$(CHARTS))-*.tgz
+	helm install $(word 1,$(CHARTS)) $(HELM_REPO_DIR)/$(word 1,$(CHARTS))-$(VERSION).tgz
 	@echo "Helm charts installed successfully."
 
 .PHONY: helm-uninstall
