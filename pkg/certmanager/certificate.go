@@ -252,7 +252,7 @@ func (m *Manager) Start() error {
 // isValidCertificate checks if the certificate is valid and not expired
 func (m *Manager) isValidCertificate(certData, keyData, caData []byte) bool {
 	logger := log.Log.WithName("cert-manager")
-	// PEM 디코딩
+	// PEM decoding
 	certBlock, _ := pem.Decode(certData)
 	if certBlock == nil {
 		logger.Error(nil, "Failed to decode PEM certificate")
@@ -265,21 +265,21 @@ func (m *Manager) isValidCertificate(certData, keyData, caData []byte) bool {
 		return false
 	}
 
-	// 서버 인증서 파싱
+	// Server certificate parsing
 	cert, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
 		logger.Error(err, "Unable to parse server certificate")
 		return false
 	}
 
-	// CA 인증서 파싱
+	// CA certificate parsing
 	caCert, err := x509.ParseCertificate(caBlock.Bytes)
 	if err != nil {
 		logger.Error(err, "Unable to parse CA certificate")
 		return false
 	}
 
-	// 현재 시간이 인증서의 유효 기간 내에 있는지 확인
+	// Verify if current time is within certificate validity period
 	now := time.Now()
 	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
 		logger.Error(nil, "Certificate is not valid")
