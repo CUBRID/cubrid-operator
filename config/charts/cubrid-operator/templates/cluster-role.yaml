@@ -3,35 +3,11 @@ kind: ClusterRole
 metadata:
   name: {{ include "cubrid-operator.clusterRoleName" . }}
 rules:
+# CUBRID Custom Resources
 - apiGroups:
   - k8s.cubrid.com
   resources:
   - backupdbs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - k8s.cubrid.com
-  resources:
-  - backupdbs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - k8s.cubrid.com
-  resources:
-  - backupdbs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - k8s.cubrid.com
-  resources:
   - cubriddbs
   verbs:
   - create
@@ -44,18 +20,20 @@ rules:
 - apiGroups:
   - k8s.cubrid.com
   resources:
+  - backupdbs/finalizers
   - cubriddbs/finalizers
   verbs:
   - update
   - get
   - list
-  - watch 
+  - watch
   - create
   - patch
   - delete
 - apiGroups:
   - k8s.cubrid.com
   resources:
+  - backupdbs/status
   - cubriddbs/status
   verbs:
   - get
@@ -63,8 +41,10 @@ rules:
   - update
   - list
   - watch
-  - create  
+  - create
   - delete
+
+# Core Resources
 - apiGroups:
   - apps
   resources:
@@ -77,6 +57,8 @@ rules:
   - patch
   - update
   - watch
+
+# Pod related permissions
 - apiGroups:
   - ""
   resources:
@@ -93,13 +75,17 @@ rules:
   - update
   - watch
   - exec
+
+# Service and Endpoint permissions
 - apiGroups:
   - ""
   resources:
-  - events
-  - secrets
-  - serviceaccounts
   - services
+  - services/finalizers
+  - services/status
+  - endpoints
+  - endpoints/restricted
+  - endpoints/status
   verbs:
   - create
   - delete
@@ -108,17 +94,25 @@ rules:
   - patch
   - update
   - watch
+
+# Other core resources
 - apiGroups:
   - ""
   resources:
-  - endpoints
-  - endpoints/restricted
+  - events
+  - secrets
+  - serviceaccounts
+  - configmaps
   verbs:
   - create
+  - delete
   - get
   - list
   - patch
-  - watch  
+  - update
+  - watch
+
+# Coordination
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -131,6 +125,8 @@ rules:
   - update
   - patch
   - delete
+
+# RBAC
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -145,33 +141,3 @@ rules:
   - update
   - watch
   - bind
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services/finalizers
-  verbs:
-  - update

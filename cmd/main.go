@@ -130,6 +130,15 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		if err = (&controller.BrokerEndpointReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+			Config: mgr.GetConfig(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BrokerEndpoint")
+			os.Exit(1)
+		}
+
 		if err = controller.NewBackupDBReconciler(mgr).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "BackupDB")
 			os.Exit(1)

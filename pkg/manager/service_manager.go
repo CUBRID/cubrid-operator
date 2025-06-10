@@ -247,7 +247,7 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 			Spec: res.CreateServiceSpec(
 				broker.ServiceType,
 				[]corev1.ServicePort{servicePort},
-				res.CreateBrokerSelector(cubridDB.Name),
+				nil,
 			),
 		}
 
