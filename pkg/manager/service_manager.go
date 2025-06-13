@@ -7,8 +7,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,7 +45,7 @@ func (m *ServiceManager) ReconcileServices(ctx context.Context, cubridDB *cubrid
 	var errs []error
 
 	// Reconcile CMS services
-	if err := m.reconcileCMSServices(ctx, cubridDB); err != nil {
+	if err := m.reconcileNodePortCMSServices(ctx, cubridDB); err != nil {
 		errs = append(errs, fmt.Errorf("failed to reconcile CMS services: %v", err))
 	}
 
@@ -115,10 +117,48 @@ func (m *ServiceManager) reconcileHeadlessService(ctx context.Context, cubridDB 
 	return nil
 }
 
-// reconcileCMSServices manages CMS NodePort services
-func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
+// reconcileNodePortCMSServices  manages CMS NodePort services
+func (m *ServiceManager) reconcileNodePortCMSServices(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	if !isCMSEnabled(cubridDB) {
 		return m.cleanupServices(ctx, cubridDB, res.ServiceTypeCMS)
+	}
+
+	// Check if nginx ingress controller exists
+	exists, err := util.IsNginxIngressControllerExists(ctx, m.Client)
+	if err != nil {
+		return fmt.Errorf("error checking ingress controller: %v", err)
+	}
+
+	// If nginx ingress controller exists, clean up NodePort services
+	if exists {
+		svclogger.Info("nginx ingress controller found, cleaning up NodePort services")
+		// Get all pods for this CubridDB
+		podList := &corev1.PodList{}
+		if err := m.List(ctx, podList, client.InNamespace(cubridDB.Namespace), client.MatchingLabels{"app": cubridDB.Name}); err != nil {
+			return fmt.Errorf("failed to list pods: %v", err)
+		}
+
+		// Delete NodePort service for each pod
+		for i := 0; i < int(cubridDB.Spec.Replication.Replicas); i++ {
+			serviceName := fmt.Sprintf(DEF.SVC_CMS_NODEPORT, cubridDB.Name, i)
+			service := &corev1.Service{}
+			err := m.Get(ctx, types.NamespacedName{
+				Name:      serviceName,
+				Namespace: cubridDB.Namespace,
+			}, service)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					continue // Service doesn't exist, skip
+				}
+				return fmt.Errorf("error getting service: %v", err)
+			}
+			if err := m.Delete(ctx, service); err != nil {
+				return fmt.Errorf("error deleting service: %v", err)
+			} else {
+				svclogger.V(1).Info("Deleted service", "name", serviceName)
+			}
+		}
+		return nil
 	}
 
 	// Get the initial start port once
@@ -148,7 +188,7 @@ func (m *ServiceManager) reconcileCMSServices(ctx context.Context, cubridDB *cub
 			return err
 		}
 
-		serviceName := fmt.Sprintf("%s-cms-%d", cubridDB.Name, i)
+		serviceName := fmt.Sprintf(DEF.SVC_CMS_NODEPORT, cubridDB.Name, i)
 
 		// Check if service already exists
 		existingService := &corev1.Service{}
@@ -339,4 +379,66 @@ func getCMSPort(cubridDB *cubridv1.CubridDB) int32 {
 		return *cubridDB.Spec.CMSService.Port
 	}
 	return DEF.SVC_CMS_PORT
+}
+
+// ReconcileIngressCMSService reconciles the CMS service for Ingress
+func (m *ServiceManager) ReconcileIngressCMSService(ctx context.Context, cubridDB *cubridv1.CubridDB, pod *corev1.Pod) error {
+	svclogger.Info("ReconcileIngressCMSService", "cubridDB", cubridDB.Name, "pod", pod.Name)
+
+	// Create CMS service for the pod
+	serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, pod.Name, cubridDB.Namespace)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: pod.Namespace,
+			Labels: map[string]string{
+				"app": "cubrid",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: "None", // Headless service
+			Selector: map[string]string{
+				"statefulset.kubernetes.io/pod-name": pod.Name,
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "cms-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       8001,
+					TargetPort: intstr.FromInt(8001),
+				},
+			},
+		},
+	}
+
+	if err := m.createOrUpdateService(ctx, service); err != nil {
+		return fmt.Errorf("error creating/updating CMS service for Ingress: %v", err)
+	}
+	svclogger.Info("Created/Updated CMS service for Ingress", "name", service.Name)
+
+	return nil
+}
+
+// DeleteIngressCMSService deletes the CMS service for Ingress
+func (m *ServiceManager) DeleteIngressCMSService(ctx context.Context, cubridDB *cubridv1.CubridDB, pod *corev1.Pod) error {
+	svclogger.Info("DeleteIngressCMSService", "cubridDB", cubridDB.Name, "pod", pod.Name)
+
+	serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, pod.Name, pod.Namespace)
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: pod.Namespace,
+		},
+	}
+
+	if err := m.Delete(ctx, service); err != nil {
+		if errors.IsNotFound(err) {
+			return nil // Service doesn't exist, nothing to delete
+		}
+		return fmt.Errorf("error deleting service: %v", err)
+	}
+
+	svclogger.Info("Deleted CMS service for Ingress", "name", service.Name)
+	return nil
 }

@@ -141,3 +141,18 @@ rules:
   - update
   - watch
   - bind
+
+# Ingress permissions
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  - ingressclasses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete

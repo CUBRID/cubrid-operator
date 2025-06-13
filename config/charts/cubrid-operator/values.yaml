@@ -136,3 +136,8 @@ webhook:
 
   serviceName:
     name: ""
+
+# Ingress configuration
+ingress:
+  # Enable ingress check for nginx ingress controller
+  enabled: true

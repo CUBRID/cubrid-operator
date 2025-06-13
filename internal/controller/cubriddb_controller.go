@@ -93,6 +93,12 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	// Create Ingress for CMS connect
+	ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
+	if err := ingressManager.ReconcileIngress(ctx, &cubridDB); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile Ingress: %v", err)
+	}
+
 	if cubridDB.IsHAEnabled() {
 		haManager := manager.NewHAManager(r.Client, r.Scheme, r.Config)
 
@@ -182,6 +188,29 @@ func (r *CubridDBReconciler) podAdded(obj interface{}) {
 	}
 
 	if cubriddb.IsHAEnabled() {
+		// Check if nginx ingress controller exists
+		exists, err := util.IsNginxIngressControllerExists(context.Background(), r.Client)
+		if err != nil {
+			cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to check nginx ingress controller for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
+			return
+		}
+
+		// Update Ingress rules only if nginx ingress controller exists
+		if exists {
+			// Create CMS service for the new pod
+			serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
+			if err := serviceManager.ReconcileIngressCMSService(context.Background(), cubriddb, addPod); err != nil {
+				cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to create CMS service for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
+				return
+			}
+
+			ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
+			if err := ingressManager.UpdateIngressRules(context.Background(), cubriddb); err != nil {
+				cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to update Ingress rules for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
+				return
+			}
+		}
+
 		if err := util.UpdateCubridDB(context.Background(), r.Client, addPod); err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to update CubridDB for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
 			return
@@ -242,6 +271,29 @@ func (r *CubridDBReconciler) podDeleted(obj interface{}) {
 	}
 
 	if cubriddb.IsHAEnabled() {
+		exists, err := util.IsNginxIngressControllerExists(context.Background(), r.Client)
+		if err != nil {
+			cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to check nginx ingress controller for Pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
+			return
+		}
+
+		// Update Ingress rules only if nginx ingress controller exists
+		if exists {
+			// Delete CMS Service for the pod
+			serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
+			if err := serviceManager.DeleteIngressCMSService(context.Background(), cubriddb, deletedPod); err != nil {
+				cubriddblog.V(1).Info(fmt.Sprintf("podDeleted: Failed to delete CMS service for Pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
+				return
+			}
+
+			// Update Ingress rules
+			ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
+			if err := ingressManager.UpdateIngressRules(context.Background(), cubriddb); err != nil {
+				cubriddblog.V(1).Info(fmt.Sprintf("podDeleted: Failed to update Ingress rules for Pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
+				return
+			}
+		}
+
 		err = util.UpdateCubridDB(context.Background(), r.Client, deletedPod)
 		if err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("Failed to update CubridDB for deleted pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())

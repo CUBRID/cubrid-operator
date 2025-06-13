@@ -144,3 +144,17 @@ Create the name of the service account to use
 {{- define "cubrid-operator-webhook.serviceName" -}}
 {{- printf "%s-webhook-service" (include "cubrid-operator.fullname" .) -}}
 {{- end -}}
+
+{{/*
+Check if nginx ingress controller exists
+*/}}
+{{- define "cubrid-operator.checkNginxIngress" -}}
+{{- if .Values.ingress.enabled }}
+{{- if not (.Capabilities.APIVersions.Has "networking.k8s.io/v1/IngressClass") }}
+  {{- fail "IngressClass API is not available. Please ensure your cluster supports networking.k8s.io/v1/IngressClass" }}
+{{- end }}
+{{- if not (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") }}
+  {{- fail "Ingress API is not available. Please ensure your cluster supports networking.k8s.io/v1/Ingress" }}
+{{- end }}
+{{- end }}
+{{- end -}}

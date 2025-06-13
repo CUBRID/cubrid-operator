@@ -9,8 +9,9 @@ import (
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -394,12 +395,25 @@ func CreatePodFullURLs(
 }
 
 // SetOwnerReference sets the owner reference for a resource without blocking owner deletion
-func SetOwnerReference(owner runtime.Object, resource v1.Object) {
-	ownerRef := v1.OwnerReference{
+func SetOwnerReference(owner runtime.Object, resource metav1.Object) {
+	ownerRef := metav1.OwnerReference{
 		APIVersion: owner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 		Kind:       owner.GetObjectKind().GroupVersionKind().Kind,
-		Name:       owner.(v1.Object).GetName(),
-		UID:        owner.(v1.Object).GetUID(),
+		Name:       owner.(metav1.Object).GetName(),
+		UID:        owner.(metav1.Object).GetUID(),
 	}
-	resource.SetOwnerReferences([]v1.OwnerReference{ownerRef})
+	resource.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+}
+
+// IsNginxIngressControllerExists checks if nginx ingress controller exists
+func IsNginxIngressControllerExists(ctx context.Context, client client.Client) (bool, error) {
+	ingressClass := &networkingv1.IngressClass{}
+	err := client.Get(ctx, types.NamespacedName{Name: "nginx"}, ingressClass)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("error checking ingress controller: %v", err)
+	}
+	return true, nil
 }

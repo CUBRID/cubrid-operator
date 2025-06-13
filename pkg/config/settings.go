@@ -68,19 +68,23 @@ const (
 
 	// CMS Service
 	SVC_NAME_SUFFIX          = "headless"
-	SVC_CMS_SUFFIX           = "-cms-svc"
+	SVC_CMS_NODEPORT         = "%s-cms-%d" // <cubriddb-name>-cms-<pod-index>
 	SVC_CMS_START_NODE_PORT  = 31000
 	SVC_CMS_PORT             = 8001
 	SVC_CMS_ENABLED          = true
 	SVC_TYPE_NODE_PORT       = (corev1.ServiceTypeClusterIP)
 	SVC_TYPE_CLUSTER_IP      = (corev1.ServiceTypeClusterIP)
-	SVC_PORT_SUFFIX          = "-port"
 	SVC_BR_NAME_QUERY_EDITOR = "cubrid-query-editor"
 	SVC_BR_NAME_BROKER1      = "cubrid-broker1"
 	SVC_HA_PORT_ID           = 59901 // This is the ha_port_id of cubrid_ha.conf.
 	SVC_HEADLESS_DNS         = "%s.%s"
 	SVC_HEADLESS_PORT_NAME   = "cubriddb-headless"
 	SVC_CMS_PORT_NAME        = "cubrid-cms-port"
+
+	// Ingress
+	SVC_INGRESS_CMS_NAME     = "%s-%s-cms-svc"
+	INGRESS_CMS_INGRESS_NAME = "%s-%s-cms-ingress"    // <cubridDB-name>-<namespace>-cms-ingress
+	INGRESS_HOST_NAME        = "%s.%s.cms.cubrid.com" // <pod-name>.<namespace>.cms.cubrid.com
 
 	ADD_REPLICALINK    = 0
 	DELETE_REPLICALINK = 1
