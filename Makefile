@@ -60,7 +60,7 @@ $(HELM_REPO_DIR):
 	@mkdir -p $(HELM_REPO_DIR)
 
 # Get version from Chart.yaml
-VERSION := $(shell grep '^version:' $(HELM_REPO_DIR)/cubrid-operator/Chart.yaml | cut -d' ' -f2)
+VERSION := $(shell grep '^version:' $(CHARTS_DIR)/cubrid-operator/Chart.yaml | cut -d' ' -f2)
 
 # helm-crds 
 .PHONY: helm-crd
