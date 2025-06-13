@@ -180,7 +180,7 @@ func (r *BrokerEndpointReconciler) execCommand(ctx context.Context, pod *corev1.
 		return "", fmt.Errorf("failed to execute command: %v, stderr: %s", err, stderr.String())
 	}
 
-	brokerEPlog.V(1).Info("Command executed successfully", "stdout", stdout.String())
+	brokerEPlog.V(2).Info("Command executed successfully", "stdout", stdout.String())
 	return stdout.String(), nil
 }
 
@@ -348,7 +348,7 @@ func (r *BrokerEndpointReconciler) updateBrokerEndpoint(ctx context.Context, cub
 
 	// Compare existing and new endpoint states
 	if reflect.DeepEqual(existingEndpoint.Subsets, endpoint.Subsets) {
-		brokerEPlog.V(1).Info("Endpoint state unchanged, skipping update", "endpoint", endpointName)
+		brokerEPlog.V(2).Info("Endpoint state unchanged, skipping update", "endpoint", endpointName)
 		return nil
 	}
 
