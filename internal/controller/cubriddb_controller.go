@@ -61,22 +61,15 @@ var cubriddblog = log.Log.WithName("CubridDB-Reconciler")
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.2/pkg/reconcile
 func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	cubriddblog.Info("CubridDB Resource Info")
-
-	// Fetch the CubridDB Custom Resource
+	cubriddblog.V(1).Info("Reconcile Start", "request", req)
 	var cubridDB cubridv1.CubridDB
+
 	if err := r.Get(ctx, req.NamespacedName, &cubridDB); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if err := r.setSpecDefaults(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error defaulting cubriddb: %v", err)
-	}
-
-	// Create service manager
-	serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
-	if serviceManager == nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create service manager")
 	}
 
 	statefulSetHandler, err := manager.NewStatefulSetManager(r.Client, r.Scheme)
@@ -86,6 +79,12 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	if err := statefulSetHandler.ReconcileStatefulSet(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Create service manager
+	serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
+	if serviceManager == nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create service manager")
 	}
 
 	// Reconcile all services
@@ -112,6 +111,7 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return result, err
 	}
 
+	cubriddblog.V(1).Info("Reconcile End", "request", req)
 	return ctrl.Result{}, nil
 }
 
@@ -124,6 +124,7 @@ func (r *CubridDBReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&cubridv1.CubridDB{}).   // Watch CubridDB resources
 		Owns(&corev1.Pod{}).         // Track related Pods
 		Owns(&appsv1.StatefulSet{}). // Track related StatefulSets
+		Owns(&corev1.Service{}).     // Track related Services
 		Complete(r); err != nil {
 		return fmt.Errorf("failed to set up main controller: %w", err)
 	}
@@ -148,7 +149,7 @@ func (r *CubridDBReconciler) SetupObjectWatcher(mgr ctrl.Manager) error {
 		DeleteFunc: r.podDeleted,
 	})
 
-	// StatefulSet Informer: Watches for StatefulSet deletion events
+	// StatefulSet Informer: Watches for StatefulSet events
 	statefulSetInformer, err := mgr.GetCache().GetInformer(context.Background(), &appsv1.StatefulSet{})
 	if err != nil {
 		return err
@@ -165,8 +166,7 @@ func (r *CubridDBReconciler) SetupObjectWatcher(mgr ctrl.Manager) error {
 	}
 
 	cubridDBInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: r.cubridAdded,
-		// UpdateFunc: r.cubridUpdated,
+		AddFunc:    r.cubridAdded,
 		DeleteFunc: r.cubridDeleted,
 	})
 
@@ -197,13 +197,6 @@ func (r *CubridDBReconciler) podAdded(obj interface{}) {
 
 		// Update Ingress rules only if nginx ingress controller exists
 		if exists {
-			// Create CMS service for the new pod
-			serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
-			if err := serviceManager.ReconcileIngressCMSService(context.Background(), cubriddb, addPod); err != nil {
-				cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to create CMS service for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
-				return
-			}
-
 			ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
 			if err := ingressManager.UpdateIngressRules(context.Background(), cubriddb); err != nil {
 				cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to update Ingress rules for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
@@ -281,7 +274,7 @@ func (r *CubridDBReconciler) podDeleted(obj interface{}) {
 		if exists {
 			// Delete CMS Service for the pod
 			serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
-			if err := serviceManager.DeleteIngressCMSService(context.Background(), cubriddb, deletedPod); err != nil {
+			if err := serviceManager.DeleteSingleIngressCMSService(context.Background(), cubriddb, deletedPod); err != nil {
 				cubriddblog.V(1).Info(fmt.Sprintf("podDeleted: Failed to delete CMS service for Pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
 				return
 			}

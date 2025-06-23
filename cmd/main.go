@@ -103,7 +103,7 @@ var rootCmd = &cobra.Command{
 	// Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := zap.Options{
-			Development: true,
+			Development: false,
 		}
 		opts.BindFlags(flag.CommandLine)
 

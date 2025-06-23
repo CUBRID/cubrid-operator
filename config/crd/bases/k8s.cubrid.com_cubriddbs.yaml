@@ -96,6 +96,16 @@ spec:
                     format: int32
                     type: integer
                 type: object
+              haPort:
+                description: HAPortConfig defines the configuration for HA port
+                properties:
+                  port:
+                    description: |-
+                      Port is the port number for the HA port
+                      Default is 59901 (CUBRID HA port)
+                    format: int32
+                    type: integer
+                type: object
               image:
                 type: string
               imagePullPolicy:

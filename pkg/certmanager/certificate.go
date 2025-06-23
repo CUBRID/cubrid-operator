@@ -290,7 +290,7 @@ func (m *Manager) isValidCertificate(certData, keyData, caData []byte) bool {
 		return false
 	}
 
-	// 키와 인증서가 서로 매칭되는지 확인
+	// Check if the key and certificate match
 	_, err = tls.X509KeyPair(certData, keyData)
 	if err != nil {
 		logger.Error(err, "Key and certificate do not match")
@@ -427,7 +427,7 @@ func (m *Manager) createSelfSignedCertificate() error {
 func (m *Manager) updateWebhookConfiguration() error {
 	logger := log.Log.WithName("cert-manager")
 
-	// CA 인증서 데이터 확인
+	// Check CA certificate data
 	if len(m.config.CACertData) == 0 {
 		return fmt.Errorf("CA certificate data is empty")
 	}

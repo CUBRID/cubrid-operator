@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"reflect"
 	"strings"
 	"time"
@@ -125,24 +126,78 @@ func (r *BrokerEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	// Check port status for each broker on each pod
-	for _, pod := range podList.Items {
-		for _, broker := range cubridDB.Spec.Broker {
-			// Check if the port is listening
-			isActive, err := r.checkPortStatus(ctx, &pod, broker.Port)
-			if err != nil {
+	// Process each broker - collect all pod statuses for each broker
+	for _, broker := range cubridDB.Spec.Broker {
+		// Collect active pod IPs for this broker
+		activePodIPs := []corev1.EndpointAddress{}
+		notReadyPodIPs := []corev1.EndpointAddress{}
+
+		for _, pod := range podList.Items {
+			// Skip pods that are not in Running state or without valid IP addresses
+			if pod.Status.Phase != corev1.PodRunning || !r.isValidIPAddress(pod.Status.PodIP) {
+				brokerEPlog.V(1).Info("Skipping pod - not running or no valid IP",
+					"pod", pod.Name,
+					"broker", broker.Name,
+					"phase", pod.Status.Phase,
+					"podIP", pod.Status.PodIP)
 				continue
 			}
 
-			// Update endpoint based on port status
-			if err := r.updateBrokerEndpoint(ctx, cubridDB, &broker, &pod, isActive, broker.Port); err != nil {
-				brokerEPlog.Error(err, "Failed to update broker endpoint", "broker", broker.Name, "pod", pod.Name)
+			// Check if the port is listening
+			isActive, err := r.checkPortStatus(ctx, &pod, broker.Port)
+			if err != nil {
+				brokerEPlog.V(1).Info("Failed to check port status, treating as not ready", "pod", pod.Name, "broker", broker.Name, "error", err.Error())
+				// If we can't check status, treat as not ready
+				notReadyPodIPs = append(notReadyPodIPs, corev1.EndpointAddress{
+					IP:       pod.Status.PodIP,
+					NodeName: &pod.Spec.NodeName,
+					TargetRef: &corev1.ObjectReference{
+						Kind:      "Pod",
+						Name:      pod.Name,
+						Namespace: pod.Namespace,
+						UID:       pod.UID,
+					},
+				})
 				continue
 			}
+
+			endpointAddr := corev1.EndpointAddress{
+				IP:       pod.Status.PodIP,
+				NodeName: &pod.Spec.NodeName,
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					UID:       pod.UID,
+				},
+			}
+
+			if isActive {
+				activePodIPs = append(activePodIPs, endpointAddr)
+			} else {
+				notReadyPodIPs = append(notReadyPodIPs, endpointAddr)
+			}
+		}
+
+		// Update endpoint with all collected information
+		if err := r.updateBrokerEndpointComplete(ctx, cubridDB, &broker, activePodIPs, notReadyPodIPs, broker.Port); err != nil {
+			brokerEPlog.Error(err, "Failed to update broker endpoint", "broker", broker.Name)
+			continue
 		}
 	}
 
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+// isValidIPAddress checks if the given IP address is valid
+func (r *BrokerEndpointReconciler) isValidIPAddress(ip string) bool {
+	if ip == "" {
+		return false
+	}
+
+	// Check if it's a valid IPv4 or IPv6 address
+	parsedIP := net.ParseIP(ip)
+	return parsedIP != nil
 }
 
 // execCommand executes a command in the pod
@@ -184,144 +239,68 @@ func (r *BrokerEndpointReconciler) execCommand(ctx context.Context, pod *corev1.
 	return stdout.String(), nil
 }
 
-// updateBrokerEndpoint updates the endpoint based on broker status
-func (r *BrokerEndpointReconciler) updateBrokerEndpoint(ctx context.Context, cubridDB *cubridv1.CubridDB, broker *cubridv1.Broker, pod *corev1.Pod, isActive bool, port int32) error {
+// updateBrokerEndpointComplete updates the endpoint based on broker status
+func (r *BrokerEndpointReconciler) updateBrokerEndpointComplete(ctx context.Context, cubridDB *cubridv1.CubridDB, broker *cubridv1.Broker, activePodIPs, notReadyPodIPs []corev1.EndpointAddress, port int32) error {
 	endpointName := broker.Name
 
-	// Get the endpoint
-	endpoint := &corev1.Endpoints{}
+	// Get the existing endpoint
+	existingEndpoint := &corev1.Endpoints{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      endpointName,
 		Namespace: cubridDB.Namespace,
-	}, endpoint)
+	}, existingEndpoint)
 
-	// If endpoint doesn't exist, create it
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			brokerEPlog.Error(err, "Failed to get endpoint")
-			return err
-		}
-		brokerEPlog.V(1).Info("Creating new endpoint", "endpoint", endpointName)
-		endpoint = &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      endpointName,
-				Namespace: cubridDB.Namespace,
-				Labels: map[string]string{
-					"app":    cubridDB.Name,
-					"broker": endpointName,
+	// Create the desired endpoint state
+	desiredEndpoint := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      endpointName,
+			Namespace: cubridDB.Namespace,
+			Labels: map[string]string{
+				"app":    cubridDB.Name,
+				"broker": endpointName,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: cubridDB.APIVersion,
+					Kind:       cubridDB.Kind,
+					Name:       cubridDB.Name,
+					UID:        cubridDB.UID,
 				},
-				OwnerReferences: []metav1.OwnerReference{
+			},
+		},
+	}
+
+	// Set subsets based on active and not ready pod IPs
+	if len(activePodIPs) > 0 {
+		desiredEndpoint.Subsets = []corev1.EndpointSubset{
+			{
+				Addresses: activePodIPs,
+				Ports: []corev1.EndpointPort{
 					{
-						APIVersion: cubridDB.APIVersion,
-						Kind:       cubridDB.Kind,
-						Name:       cubridDB.Name,
-						UID:        cubridDB.UID,
+						Name:     endpointName,
+						Port:     port,
+						Protocol: corev1.ProtocolTCP,
 					},
 				},
 			},
 		}
-	}
-
-	// Update endpoint based on broker status
-	if isActive {
-		// Add pod IP to endpoint if not exists
-		found := false
-		for _, subset := range endpoint.Subsets {
-			for _, addr := range subset.Addresses {
-				if addr.IP == pod.Status.PodIP {
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
-			brokerEPlog.V(1).Info("Adding pod IP to endpoint", "endpoint", endpointName, "podIP", pod.Status.PodIP)
-			// Check if there's an existing subset with the same port
-			portFound := false
-			for i, subset := range endpoint.Subsets {
-				for _, p := range subset.Ports {
-					if p.Port == port {
-						// Add to existing subset
-						endpoint.Subsets[i].Addresses = append(subset.Addresses, corev1.EndpointAddress{
-							IP:       pod.Status.PodIP,
-							NodeName: &pod.Spec.NodeName,
-							TargetRef: &corev1.ObjectReference{
-								Kind:      "Pod",
-								Name:      pod.Name,
-								Namespace: pod.Namespace,
-								UID:       pod.UID,
-							},
-						})
-						portFound = true
-						break
-					}
-				}
-				if portFound {
-					break
-				}
-			}
-			if !portFound {
-				// Create new subset
-				endpoint.Subsets = append(endpoint.Subsets, corev1.EndpointSubset{
-					Addresses: []corev1.EndpointAddress{
-						{
-							IP:       pod.Status.PodIP,
-							NodeName: &pod.Spec.NodeName,
-							TargetRef: &corev1.ObjectReference{
-								Kind:      "Pod",
-								Name:      pod.Name,
-								Namespace: pod.Namespace,
-								UID:       pod.UID,
-							},
-						},
-					},
-					Ports: []corev1.EndpointPort{
-						{
-							Name:     endpointName,
-							Port:     port,
-							Protocol: corev1.ProtocolTCP,
-						},
-					},
-				})
-			}
-		}
-	} else {
-		// Remove pod IP from endpoint if exists
-		brokerEPlog.V(1).Info("Removing pod IP from endpoint", "endpoint", endpointName, "podIP", pod.Status.PodIP)
-		newSubsets := []corev1.EndpointSubset{}
-		for _, subset := range endpoint.Subsets {
-			newAddresses := []corev1.EndpointAddress{}
-			for _, addr := range subset.Addresses {
-				if addr.IP != pod.Status.PodIP {
-					newAddresses = append(newAddresses, addr)
-				}
-			}
-			// Only add subset if it has addresses
-			if len(newAddresses) > 0 {
-				newSubsets = append(newSubsets, corev1.EndpointSubset{
-					Addresses: newAddresses,
-					Ports:     subset.Ports,
-				})
-			}
-		}
-		endpoint.Subsets = newSubsets
-	}
-
-	// If no subsets left, create an empty subset with notReadyAddresses
-	if len(endpoint.Subsets) == 0 {
-		endpoint.Subsets = []corev1.EndpointSubset{
+	} else if len(notReadyPodIPs) > 0 {
+		desiredEndpoint.Subsets = []corev1.EndpointSubset{
 			{
-				NotReadyAddresses: []corev1.EndpointAddress{
+				NotReadyAddresses: notReadyPodIPs,
+				Ports: []corev1.EndpointPort{
 					{
-						IP: pod.Status.PodIP,
-						TargetRef: &corev1.ObjectReference{
-							Kind:      "Pod",
-							Name:      pod.Name,
-							Namespace: pod.Namespace,
-							UID:       pod.UID,
-						},
+						Name:     endpointName,
+						Port:     port,
+						Protocol: corev1.ProtocolTCP,
 					},
 				},
+			},
+		}
+	} else {
+		// No pods available
+		desiredEndpoint.Subsets = []corev1.EndpointSubset{
+			{
 				Ports: []corev1.EndpointPort{
 					{
 						Name:     endpointName,
@@ -333,25 +312,25 @@ func (r *BrokerEndpointReconciler) updateBrokerEndpoint(ctx context.Context, cub
 		}
 	}
 
-	// Create or Update endpoint
-	existingEndpoint := &corev1.Endpoints{}
-	if err := r.Get(ctx, types.NamespacedName{
-		Name:      endpointName,
-		Namespace: cubridDB.Namespace,
-	}, existingEndpoint); err != nil {
+	// If endpoint doesn't exist, create it
+	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
+			brokerEPlog.Error(err, "Failed to get endpoint")
 			return err
 		}
-		brokerEPlog.V(1).Info("Creating new endpoint", "endpoint", endpointName)
-		return r.Create(ctx, endpoint)
+		brokerEPlog.V(1).Info("Creating new endpoint", "endpoint", endpointName, "activePods", len(activePodIPs), "notReadyPods", len(notReadyPodIPs))
+		return r.Create(ctx, desiredEndpoint)
 	}
 
-	// Compare existing and new endpoint states
-	if reflect.DeepEqual(existingEndpoint.Subsets, endpoint.Subsets) {
+	// Compare existing and desired endpoint states
+	if reflect.DeepEqual(existingEndpoint.Subsets, desiredEndpoint.Subsets) {
 		brokerEPlog.V(2).Info("Endpoint state unchanged, skipping update", "endpoint", endpointName)
 		return nil
 	}
 
-	brokerEPlog.V(1).Info("Updating existing endpoint", "endpoint", endpointName)
-	return r.Update(ctx, endpoint)
+	brokerEPlog.V(1).Info("Updating existing endpoint", "endpoint", endpointName, "activePods", len(activePodIPs), "notReadyPods", len(notReadyPodIPs))
+
+	// Update the existing endpoint with desired state
+	existingEndpoint.Subsets = desiredEndpoint.Subsets
+	return r.Update(ctx, existingEndpoint)
 }

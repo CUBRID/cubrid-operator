@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: cubrid-single
 spec:
-  image: airnet73/cubrid:v11.4-latest
+  image: airnet73/cubrid
   initContainerImage: busybox
   replication:
     enable: false

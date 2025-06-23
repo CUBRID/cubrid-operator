@@ -4,9 +4,10 @@ metadata:
   name: ha-ms
 
 spec:
-  image: airnet73/cubrid:v11.4.0.1778
+  initContainerImage: busybox
+  image: airnet73/cubrid
   updateStrategy:
-    type: "RollingUpdate" 
+    type: RollingUpdate
     rollingUpdate:
       partition: 0        
       maxUnavailable: 3
@@ -14,8 +15,11 @@ spec:
     enable: true
     replicas: 2
     hamodeType:
-      type: "master-slave"
- 
+      type: master-slave
+  cmsService:
+    enabled: true
+    startPort: 31000
+    port: 8001
   broker:
   - name: ms-broker1-svc
     port: 30000

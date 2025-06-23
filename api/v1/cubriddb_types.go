@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -36,6 +37,7 @@ type CubridDBSpec struct {
 	Affinity           *Affinity                         `json:"affinty,omitempty"`
 	Broker             []Broker                          `json:"broker,omitempty"`
 	CMSService         *CMSServiceConfig                 `json:"cmsService,omitempty"`
+	HAPort             *HAPortConfig                     `json:"haPort,omitempty"`
 	Image              string                            `json:"image,omitempty"`
 	InitContainerImage string                            `json:"initContainerImage,omitempty"`
 	Storage            []Storage                         `json:"storage,omitempty"`
@@ -118,6 +120,13 @@ type CMSServiceConfig struct {
 	Port *int32 `json:"port,omitempty"`
 }
 
+// HAPortConfig defines the configuration for HA port
+type HAPortConfig struct {
+	// Port is the port number for the HA port
+	// Default is 59901 (CUBRID HA port)
+	Port *int32 `json:"port,omitempty"`
+}
+
 type Storage struct {
 	Name             string             `json:"name,omitempty"`
 	MountPath        string             `json:"mountPath,omitempty"`
@@ -149,6 +158,7 @@ func (c *CubridDB) SetDefaults() {
 	c.InitAffinity()
 	c.InitUpdateStrategy()
 	c.InitCMSService()
+	c.InitHAPort()
 }
 
 func (c *CubridDB) Replication() Replication {
@@ -167,7 +177,7 @@ func (c *CubridDB) Replication() Replication {
 }
 
 func (c *CubridDB) Affinity() Affinity {
-	c.initAffinity()
+	c.InitAffinity()
 	return *c.Spec.Affinity
 }
 
@@ -213,23 +223,26 @@ func (c *CubridDB) HAmodeType() string {
 }
 
 func (c *CubridDB) InitBroker() {
-	if len(c.Spec.Broker) == 0 {
-		broker1 := Broker{
-			Name:        DEF.SVC_BR_NAME_QUERY_EDITOR,
-			Port:        int32(30000),
-			ServiceType: DEF.SVC_TYPE_NODE_PORT,
-			ServicePort: int32(30000),
-		}
-
-		broker2 := Broker{
-			Name:        DEF.SVC_BR_NAME_BROKER1,
-			Port:        int32(33000),
-			ServiceType: DEF.SVC_TYPE_NODE_PORT,
-			ServicePort: int32(31000),
-		}
-
-		c.Spec.Broker = []Broker{broker1, broker2}
+	// Do not change if Broker is already set
+	if len(c.Spec.Broker) > 0 {
+		return
 	}
+
+	broker1 := Broker{
+		Name:        DEF.SVC_BR_NAME_QUERY_EDITOR,
+		Port:        int32(30000),
+		ServiceType: DEF.SVC_TYPE_NODE_PORT,
+		ServicePort: int32(30000),
+	}
+
+	broker2 := Broker{
+		Name:        DEF.SVC_BR_NAME_BROKER1,
+		Port:        int32(33000),
+		ServiceType: DEF.SVC_TYPE_NODE_PORT,
+		ServicePort: int32(31000),
+	}
+
+	c.Spec.Broker = []Broker{broker1, broker2}
 }
 
 func (c *CubridDB) InitImage() {
@@ -242,73 +255,106 @@ func (c *CubridDB) InitImage() {
 }
 
 func (c *CubridDB) InitStorages() {
-	if len(c.Spec.Storage) == 0 {
-		size := resource.MustParse(DEF.Default_Volume_Size)
-		db_storage := Storage{
-			Name:             DEF.DatabaseStorageVolumeName,
-			Type:             DEF.StorageType_Database,
-			MountPath:        "/home/cubrid/CUBRID/databases",
-			StorageClassName: DEF.DefaultStorageClassName,
-			Size:             &size,
-			VolumeName:       "",
-		}
-
-		log_storage := Storage{
-			Name:             DEF.LogsStorageVolumeName,
-			Type:             DEF.StorageType_Logs,
-			MountPath:        "/home/cubrid/CUBRID/log",
-			StorageClassName: DEF.DefaultStorageClassName,
-			Size:             &size,
-			VolumeName:       "",
-		}
-
-		backupdb_storage := Storage{
-			Name:             DEF.BackupDBStorageVolumeName,
-			Type:             DEF.StorageType_backup,
-			MountPath:        "/home/cubrid/CUBRID/backupdb",
-			StorageClassName: DEF.DefaultStorageClassName,
-			Size:             &size,
-			VolumeName:       "",
-		}
-
-		conf_storage := Storage{
-			Name:             DEF.ConfStorageVolumeName,
-			Type:             DEF.StorageType_conf,
-			MountPath:        "/home/cubrid/CUBRID/conf",
-			StorageClassName: DEF.DefaultStorageClassName,
-			Size:             &size,
-			VolumeName:       "",
-		}
-
-		c.Spec.Storage = []Storage{db_storage, log_storage, backupdb_storage, conf_storage}
+	// Do not change if Storage is already set
+	if len(c.Spec.Storage) > 0 {
+		return
 	}
+
+	size := resource.MustParse(DEF.Default_Volume_Size)
+	db_storage := Storage{
+		Name:             DEF.DatabaseStorageVolumeName,
+		Type:             DEF.StorageType_Database,
+		MountPath:        "/home/cubrid/CUBRID/databases",
+		StorageClassName: DEF.DefaultStorageClassName,
+		Size:             &size,
+		VolumeName:       "",
+	}
+
+	log_storage := Storage{
+		Name:             DEF.LogsStorageVolumeName,
+		Type:             DEF.StorageType_Logs,
+		MountPath:        "/home/cubrid/CUBRID/log",
+		StorageClassName: DEF.DefaultStorageClassName,
+		Size:             &size,
+		VolumeName:       "",
+	}
+
+	backupdb_storage := Storage{
+		Name:             DEF.BackupDBStorageVolumeName,
+		Type:             DEF.StorageType_backup,
+		MountPath:        "/home/cubrid/CUBRID/backupdb",
+		StorageClassName: DEF.DefaultStorageClassName,
+		Size:             &size,
+		VolumeName:       "",
+	}
+
+	conf_storage := Storage{
+		Name:             DEF.ConfStorageVolumeName,
+		Type:             DEF.StorageType_conf,
+		MountPath:        "/home/cubrid/CUBRID/conf",
+		StorageClassName: DEF.DefaultStorageClassName,
+		Size:             &size,
+		VolumeName:       "",
+	}
+
+	c.Spec.Storage = []Storage{db_storage, log_storage, backupdb_storage, conf_storage}
 }
 
 func (c *CubridDB) InitAffinity() {
-	if c.Spec.Affinity == nil {
-		c.Spec.Affinity = &Affinity{}
-		if c.Replication().Enable {
-			c.Spec.Affinity.EnableAntiAffinity = true
-		} else {
-			c.Spec.Affinity.EnableAntiAffinity = false
-		}
+	// Do not change if Affinity is already set
+	if c.Spec.Affinity != nil {
+		return
+	}
+
+	c.Spec.Affinity = &Affinity{}
+	if c.Replication().Enable {
+		c.Spec.Affinity.EnableAntiAffinity = true
+	} else {
+		c.Spec.Affinity.EnableAntiAffinity = false
 	}
 }
 
 func (c *CubridDB) InitUpdateStrategy() {
-	if c.Spec.UpdateStrategy == nil || c.Spec.UpdateStrategy.Type == "" {
+	// Set default values only if UpdateStrategy is nil
+	if c.Spec.UpdateStrategy == nil {
+		partition := int32(0)
+		maxUnavailable := intstr.FromInt(1)
 		c.Spec.UpdateStrategy = &appsv1.StatefulSetUpdateStrategy{
 			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				Partition:      &partition,
+				MaxUnavailable: &maxUnavailable,
+			},
+		}
+		return
+	}
+
+	// If UpdateStrategy already exists, set only the minimum required fields
+	// Set Type only if it's empty
+	if c.Spec.UpdateStrategy.Type == "" {
+		c.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
+	}
+
+	// Set RollingUpdate only if Type is RollingUpdate but RollingUpdate field is nil
+	if c.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType && c.Spec.UpdateStrategy.RollingUpdate == nil {
+		partition := int32(0)
+		maxUnavailable := intstr.FromInt(1)
+		c.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{
+			Partition:      &partition,
+			MaxUnavailable: &maxUnavailable,
 		}
 	}
 }
 
 // setCMSServiceDefaults sets defaults for CMS service configuration
 func (c *CubridDB) InitCMSService() {
+	// Create CMSService only if it is nil
 	if c.Spec.CMSService == nil {
+		cubriddblog.Info("InitCMSService CMSService is nil", "name", c.Name)
 		c.Spec.CMSService = &CMSServiceConfig{}
 	}
 
+	// Set default values only if each field is nil
 	if c.Spec.CMSService.Enabled == nil {
 		enabled := DEF.SVC_CMS_ENABLED
 		c.Spec.CMSService.Enabled = &enabled
@@ -320,15 +366,19 @@ func (c *CubridDB) InitCMSService() {
 	}
 
 	if c.Spec.CMSService.Port == nil {
-		port := int32(DEF.SVC_CMS_PORT)
+		port := int32(DEF.CMS_PORT)
 		c.Spec.CMSService.Port = &port
 	}
 }
 
-// GetCMSPort returns the CMS port number
+// GetCMSPort returns the CMS port number for all CMS-related services
+// This ensures consistency across:
+// - Ingress CMS services
+// - Ingress backend services
+// - CMS NodePort services
 func (c *CubridDB) GetCMSPort() int32 {
 	if c.Spec.CMSService == nil || c.Spec.CMSService.Port == nil {
-		return DEF.SVC_CMS_PORT
+		return DEF.CMS_PORT
 	}
 	return *c.Spec.CMSService.Port
 }
@@ -347,4 +397,26 @@ func (c *CubridDB) IsCMSEnabled() bool {
 		return DEF.SVC_CMS_ENABLED
 	}
 	return *c.Spec.CMSService.Enabled
+}
+
+func (c *CubridDB) InitHAPort() {
+	// Create HAPort only if it is nil
+	if c.Spec.HAPort == nil {
+		cubriddblog.Info("InitHAPort HAPort is nil", "name", c.Name)
+		c.Spec.HAPort = &HAPortConfig{}
+	}
+
+	// Set default value only if Port is nil
+	if c.Spec.HAPort.Port == nil {
+		port := int32(DEF.SVC_HA_PORT)
+		c.Spec.HAPort.Port = &port
+	}
+}
+
+// GetHAPort returns the HA port number
+func (c *CubridDB) GetHAPort() int32 {
+	if c.Spec.HAPort == nil || c.Spec.HAPort.Port == nil {
+		return DEF.SVC_HA_PORT
+	}
+	return *c.Spec.HAPort.Port
 }

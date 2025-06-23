@@ -4,7 +4,8 @@ metadata:
   name: ha-rep
 
 spec:
-  image: airnet73/cubrid:v11.4.0.1778
+  initContainerImage: busybox 
+  image: airnet73/cubrid
   updateStrategy:
     type: "RollingUpdate" 
     rollingUpdate:

@@ -1,13 +1,12 @@
 package pkg
 
 import (
-	"strconv"
-
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	meta "github.com/cubrid/cubrid-operator/pkg/meta"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func CreateStatefulSet(
@@ -29,10 +28,9 @@ func CreateStatefulSet(
 	}
 
 	labels := map[string]string{"app": cubridDB.Name}
-	annotations := map[string]string{"lastReplicas": strconv.Itoa(int(replicaNum))}
 
 	return &appsv1.StatefulSet{
-		ObjectMeta: meta.NewObjectMeta(cubridDB.Name, cubridDB.Namespace, labels, annotations),
+		ObjectMeta: meta.NewObjectMeta(cubridDB.Name, cubridDB.Namespace, labels, nil),
 		Spec: appsv1.StatefulSetSpec{
 			Selector:             meta.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
 			ServiceName:          serviceName,
@@ -46,9 +44,29 @@ func CreateStatefulSet(
 
 func statefulSetUpdateStrategy(strategy *appsv1.StatefulSetUpdateStrategy) appsv1.StatefulSetUpdateStrategy {
 	if strategy != nil {
+		if strategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+			if strategy.RollingUpdate == nil {
+				strategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+			}
+			if strategy.RollingUpdate.Partition == nil {
+				partition := int32(0)
+				strategy.RollingUpdate.Partition = &partition
+			}
+			if strategy.RollingUpdate.MaxUnavailable == nil {
+				maxUnavailable := intstr.FromInt(1)
+				strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+			}
+		}
 		return *strategy
 	}
+
+	partition := int32(0)
+	maxUnavailable := intstr.FromInt(1)
 	return appsv1.StatefulSetUpdateStrategy{
 		Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+			Partition:      &partition,
+			MaxUnavailable: &maxUnavailable,
+		},
 	}
 }

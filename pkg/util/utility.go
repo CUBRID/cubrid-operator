@@ -271,18 +271,6 @@ func InitCubridRef(cubridDB *cubridv1.CubridDB) *cubridv1.CubridRef {
 	return ref
 }
 
-func NewCubridRef(cubridDB *cubridv1.CubridDB) *cubridv1.CubridRef {
-	ref := cubridDB.Spec.Replication.HAmodeType.CubridRef
-	if ref == nil {
-		return &cubridv1.CubridRef{
-			Name:        "",
-			Namespace:   "",
-			ReplicaLink: "",
-		}
-	}
-	return ref
-}
-
 func AllContainersRunning(pod *corev1.Pod) (bool, error) {
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.State.Running == nil {

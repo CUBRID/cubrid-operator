@@ -70,15 +70,14 @@ const (
 	SVC_NAME_SUFFIX          = "headless"
 	SVC_CMS_NODEPORT         = "%s-cms-%d" // <cubriddb-name>-cms-<pod-index>
 	SVC_CMS_START_NODE_PORT  = 31000
-	SVC_CMS_PORT             = 8001
 	SVC_CMS_ENABLED          = true
 	SVC_TYPE_NODE_PORT       = (corev1.ServiceTypeClusterIP)
 	SVC_TYPE_CLUSTER_IP      = (corev1.ServiceTypeClusterIP)
 	SVC_BR_NAME_QUERY_EDITOR = "cubrid-query-editor"
 	SVC_BR_NAME_BROKER1      = "cubrid-broker1"
-	SVC_HA_PORT_ID           = 59901 // This is the ha_port_id of cubrid_ha.conf.
 	SVC_HEADLESS_DNS         = "%s.%s"
 	SVC_HEADLESS_PORT_NAME   = "cubriddb-headless"
+	SVC_HA_PORT              = 59901 // Default port for HA service
 	SVC_CMS_PORT_NAME        = "cubrid-cms-port"
 
 	// Ingress

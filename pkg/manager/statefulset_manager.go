@@ -3,27 +3,26 @@ package manager
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
-
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
-	meta "github.com/cubrid/cubrid-operator/pkg/meta"
+	metapkg "github.com/cubrid/cubrid-operator/pkg/meta"
 	"github.com/cubrid/cubrid-operator/pkg/rbac"
 	res "github.com/cubrid/cubrid-operator/pkg/resources"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// log is for logging in this package.
-var stslogger = log.Log.WithName("StatufulSet")
+var stslogger = log.Log.WithName("StatefulSet")
 
 type StatefulSetManager struct {
 	client.Client
@@ -124,7 +123,7 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 	}
 
 	podTemplateSpec := res.CreatePodTemplateSpec(
-		meta.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
+		metapkg.NewLabelSelector(cubridDB.Name, group_name, group_type, serviceName),
 		initContainers,
 		containers,
 		res.CreatePodSecurityContext(DEF.CubridUser, DEF.CubridGroup),
@@ -135,7 +134,7 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 
 	volumeClaimTemplates, err := res.NewPersistentVolumeClaims(cubridDB)
 	if err != nil {
-		return fmt.Errorf("error createing PVCs: %v", err)
+		return fmt.Errorf("error creating PVCs: %v", err)
 	}
 
 	// Create the StatefulSet
@@ -158,44 +157,265 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 		return nil
 	}
 
-	if cubridDB.IsHAEnabled() {
-		lastReplicasAnnotation := existingSts.Annotations["lastReplicas"]
-		currentReplicas := *existingSts.Spec.Replicas
-		desiredReplicas := cubridDB.Spec.Replication.Replicas
+	// Handle replicas synchronization
+	if err := r.syncReplicas(ctx, cubridDB, &existingSts); err != nil {
+		return fmt.Errorf("error synchronizing replicas: %v", err)
+	}
 
-		if desiredReplicas != currentReplicas && strconv.Itoa(int(desiredReplicas)) != lastReplicasAnnotation {
-			patch := client.MergeFrom(existingSts.DeepCopy())
-			existingSts.Spec.Replicas = &desiredReplicas
-			existingSts.Annotations["lastReplicas"] = strconv.Itoa(int(desiredReplicas))
+	// Handle StatefulSet spec updates (image, updateStrategy, etc.)
+	if err := r.syncStatefulSetSpec(ctx, cubridDB, &existingSts, desiredSTS); err != nil {
+		return fmt.Errorf("error synchronizing StatefulSet spec: %v", err)
+	}
 
-			if err := r.Client.Patch(ctx, &existingSts, patch); err != nil {
-				return fmt.Errorf("error patching StatefulSet replicas from CR update: %v", err)
-			}
-			return nil
-		}
+	return nil
+}
 
-		if strconv.Itoa(int(currentReplicas)) != lastReplicasAnnotation {
-			cubridDB.Spec.Replication.Replicas = currentReplicas
-			if err := r.Client.Update(ctx, cubridDB); err != nil {
-				return fmt.Errorf("error updating CR replicas from StatefulSet scale: %v", err)
-			}
+// syncReplicas handles the synchronization of replicas between StatefulSet and CubridDB CR
+func (r *StatefulSetManager) syncReplicas(ctx context.Context, cubridDB *cubridv1.CubridDB, existingSts *appsv1.StatefulSet) error {
+	currentReplicas := *existingSts.Spec.Replicas
+	desiredReplicas := cubridDB.Spec.Replication.Replicas
 
-			if err := meta.UpdateLastReplicasAnnotation(ctx, r.Client, &existingSts, currentReplicas); err != nil {
-				return fmt.Errorf("error updating StatefulSet annotation(LastReplicas): %v", err)
-			}
-
-			return nil
-		}
-	} else {
-		desiredReplicas := cubridDB.Spec.Replication.Replicas
-		patch := client.MergeFrom(existingSts.DeepCopy())
-		existingSts.Spec.Replicas = &desiredReplicas
-		existingSts.Annotations["lastReplicas"] = strconv.Itoa(int(desiredReplicas))
-
-		if err := r.Client.Patch(ctx, &existingSts, patch); err != nil {
-			return fmt.Errorf("error patching StatefulSet replicas from CR update: %v", err)
+	// Get the previous StatefulSet replicas from annotation
+	lastReplicasStr := existingSts.Annotations["cubrid.io/last-replicas"]
+	lastReplicas := currentReplicas
+	if lastReplicasStr != "" {
+		if val, err := strconv.ParseInt(lastReplicasStr, 10, 32); err == nil {
+			lastReplicas = int32(val)
 		}
 	}
 
+	// If replicas are different
+	if currentReplicas != desiredReplicas {
+		// Check which side changed
+		if lastReplicas == desiredReplicas {
+			// StatefulSet was changed (e.g., kubectl scale)
+			// Validate replicas change
+			if err := r.validateReplicasChange(ctx, cubridDB, currentReplicas); err != nil {
+				return fmt.Errorf("invalid replicas change: %v", err)
+			}
+
+			// Update CubridDB CR replicas to match StatefulSet
+			cubridDB.Spec.Replication.Replicas = currentReplicas
+			if err := r.Client.Update(ctx, cubridDB); err != nil {
+				return fmt.Errorf("error updating CubridDB replicas: %v", err)
+			}
+
+			stslogger.V(1).Info("Synchronized CubridDB replicas from StatefulSet change",
+				"name", cubridDB.Name,
+				"namespace", cubridDB.Namespace,
+				"replicas", currentReplicas)
+		} else {
+			// CubridDB CR was changed
+			// Validate replicas change
+			if err := r.validateReplicasChange(ctx, cubridDB, desiredReplicas); err != nil {
+				return fmt.Errorf("invalid replicas change: %v", err)
+			}
+
+			// Update StatefulSet replicas
+			patch := client.MergeFrom(existingSts.DeepCopy())
+			existingSts.Spec.Replicas = &desiredReplicas
+
+			if err := r.Client.Patch(ctx, existingSts, patch); err != nil {
+				return fmt.Errorf("error patching StatefulSet replicas: %v", err)
+			}
+
+			stslogger.V(1).Info("Updated StatefulSet replicas from CubridDB CR change",
+				"name", existingSts.Name,
+				"namespace", existingSts.Namespace,
+				"oldReplicas", currentReplicas,
+				"newReplicas", desiredReplicas)
+		}
+	}
+
+	// Update the last replicas annotation
+	patch := client.MergeFrom(existingSts.DeepCopy())
+	if existingSts.Annotations == nil {
+		existingSts.Annotations = make(map[string]string)
+	}
+	existingSts.Annotations["cubrid.io/last-replicas"] = strconv.FormatInt(int64(currentReplicas), 10)
+	if err := r.Client.Patch(ctx, existingSts, patch); err != nil {
+		return fmt.Errorf("error updating last replicas annotation: %v", err)
+	}
+	return nil
+}
+
+// validateReplicasChange validates the replicas change request
+func (r *StatefulSetManager) validateReplicasChange(ctx context.Context, cubridDB *cubridv1.CubridDB, desiredReplicas int32) error {
+	if cubridDB.IsHAEnabled() {
+		// HA mode: replicas must be greater than 0
+		if desiredReplicas <= 0 {
+			return fmt.Errorf("HA mode replicas must be greater than 0")
+		}
+	} else {
+		// Single mode: replicas must be exactly 1
+		if desiredReplicas != 1 {
+			return fmt.Errorf("single mode must have exactly 1 replica")
+		}
+	}
+
+	return nil
+}
+
+// syncStatefulSetSpec handles StatefulSet spec updates like image, updateStrategy, etc.
+func (r *StatefulSetManager) syncStatefulSetSpec(ctx context.Context, cubridDB *cubridv1.CubridDB, existingSts *appsv1.StatefulSet, desiredSts *appsv1.StatefulSet) error {
+	// Check if any spec changes are needed
+	needsUpdate := false
+	needsRollingUpdate := false
+
+	// Check image changes - this triggers rolling update
+	if len(existingSts.Spec.Template.Spec.Containers) > 0 && len(desiredSts.Spec.Template.Spec.Containers) > 0 {
+		if existingSts.Spec.Template.Spec.Containers[0].Image != desiredSts.Spec.Template.Spec.Containers[0].Image {
+			stslogger.V(1).Info("Image change detected - will trigger rolling update",
+				"name", existingSts.Name,
+				"namespace", existingSts.Namespace,
+				"oldImage", existingSts.Spec.Template.Spec.Containers[0].Image,
+				"newImage", desiredSts.Spec.Template.Spec.Containers[0].Image)
+			needsUpdate = true
+			needsRollingUpdate = true
+		}
+	}
+
+	// Check updateStrategy changes - this doesn't trigger rolling update
+	if !reflect.DeepEqual(existingSts.Spec.UpdateStrategy, desiredSts.Spec.UpdateStrategy) {
+		stslogger.V(1).Info("UpdateStrategy change detected",
+			"name", existingSts.Name,
+			"namespace", existingSts.Namespace)
+		needsUpdate = true
+	}
+
+	// Check other template changes (excluding image, replicas, and affinity)
+	existingTemplate := existingSts.Spec.Template.DeepCopy()
+	desiredTemplate := desiredSts.Spec.Template.DeepCopy()
+
+	// Remove image from comparison since it's handled separately
+	if len(existingTemplate.Spec.Containers) > 0 && len(desiredTemplate.Spec.Containers) > 0 {
+		existingTemplate.Spec.Containers[0].Image = ""
+		desiredTemplate.Spec.Containers[0].Image = ""
+	}
+
+	// Remove affinity from comparison since it's handled separately
+	existingTemplate.Spec.Affinity = nil
+	desiredTemplate.Spec.Affinity = nil
+
+	// Remove replicas from comparison as they are handled separately
+	if !reflect.DeepEqual(existingTemplate, desiredTemplate) {
+		// Add detailed debugging to identify what's changing
+		stslogger.V(2).Info("Template difference detected - analyzing changes",
+			"name", existingSts.Name,
+			"namespace", existingSts.Namespace)
+
+		// Compare containers
+		if len(existingTemplate.Spec.Containers) > 0 && len(desiredTemplate.Spec.Containers) > 0 {
+			existingContainer := existingTemplate.Spec.Containers[0]
+			desiredContainer := desiredTemplate.Spec.Containers[0]
+
+			if !reflect.DeepEqual(existingContainer.Ports, desiredContainer.Ports) {
+				stslogger.V(2).Info("Container ports differ",
+					"name", existingSts.Name,
+					"existingPorts", existingContainer.Ports,
+					"desiredPorts", desiredContainer.Ports)
+			}
+
+			if !reflect.DeepEqual(existingContainer.VolumeMounts, desiredContainer.VolumeMounts) {
+				stslogger.V(2).Info("Container volume mounts differ",
+					"name", existingSts.Name,
+					"existingVolumeMounts", existingContainer.VolumeMounts,
+					"desiredVolumeMounts", desiredContainer.VolumeMounts)
+			}
+
+			if !reflect.DeepEqual(existingContainer.SecurityContext, desiredContainer.SecurityContext) {
+				stslogger.V(2).Info("Container security context differs",
+					"name", existingSts.Name,
+					"existingSecurityContext", existingContainer.SecurityContext,
+					"desiredSecurityContext", desiredContainer.SecurityContext)
+			}
+		}
+
+		// Compare init containers
+		if !reflect.DeepEqual(existingTemplate.Spec.InitContainers, desiredTemplate.Spec.InitContainers) {
+			stslogger.V(2).Info("Init containers differ",
+				"name", existingSts.Name,
+				"existingInitContainers", existingTemplate.Spec.InitContainers,
+				"desiredInitContainers", desiredTemplate.Spec.InitContainers)
+		}
+
+		// Compare volumes
+		if !reflect.DeepEqual(existingTemplate.Spec.Volumes, desiredTemplate.Spec.Volumes) {
+			stslogger.V(2).Info("Volumes differ",
+				"name", existingSts.Name,
+				"existingVolumes", existingTemplate.Spec.Volumes,
+				"desiredVolumes", desiredTemplate.Spec.Volumes)
+		}
+
+		// Compare security context
+		if !reflect.DeepEqual(existingTemplate.Spec.SecurityContext, desiredTemplate.Spec.SecurityContext) {
+			stslogger.V(2).Info("Pod security context differs",
+				"name", existingSts.Name,
+				"existingSecurityContext", existingTemplate.Spec.SecurityContext,
+				"desiredSecurityContext", desiredTemplate.Spec.SecurityContext)
+		}
+
+		// Compare service account
+		if existingTemplate.Spec.ServiceAccountName != desiredTemplate.Spec.ServiceAccountName {
+			stslogger.V(2).Info("service account differs",
+				"name", existingSts.Name,
+				"existingServiceAccount", existingTemplate.Spec.ServiceAccountName,
+				"desiredServiceAccount", desiredTemplate.Spec.ServiceAccountName)
+		}
+
+		if needsRollingUpdate {
+			// Image change detected, include all template changes in rolling update
+			stslogger.V(2).Info("Additional template changes detected - will be included in rolling update",
+				"name", existingSts.Name,
+				"namespace", existingSts.Namespace)
+		} else {
+			// Non-image template changes (like container ports) - log but don't update to prevent rolling updates
+			stslogger.V(2).Info("Non-image template change detected - skipping to prevent rolling update",
+				"name", existingSts.Name,
+				"namespace", existingSts.Namespace,
+				"reason", "Only image changes trigger rolling updates",
+				"note", "Container ports and other template changes will be handled by service reconciliation")
+		}
+	}
+
+	// Handle affinity changes separately
+	if !reflect.DeepEqual(existingSts.Spec.Template.Spec.Affinity, desiredSts.Spec.Template.Spec.Affinity) {
+		stslogger.V(1).Info("Affinity change detected - updating separately",
+			"name", existingSts.Name,
+			"namespace", existingSts.Namespace)
+		needsUpdate = true
+	}
+
+	if needsUpdate {
+		// Update StatefulSet spec
+		patch := client.MergeFrom(existingSts.DeepCopy())
+
+		if needsRollingUpdate {
+			// Full template update - triggers rolling update
+			existingSts.Spec.Template = desiredSts.Spec.Template
+			stslogger.V(1).Info("Performing rolling update due to image change",
+				"name", existingSts.Name,
+				"namespace", existingSts.Namespace)
+		} else {
+			// Update only specific fields without triggering rolling update
+			if !reflect.DeepEqual(existingSts.Spec.Template.Spec.Affinity, desiredSts.Spec.Template.Spec.Affinity) {
+				existingSts.Spec.Template.Spec.Affinity = desiredSts.Spec.Template.Spec.Affinity
+			}
+		}
+
+		// Update updateStrategy
+		existingSts.Spec.UpdateStrategy = desiredSts.Spec.UpdateStrategy
+
+		if err := r.Client.Patch(ctx, existingSts, patch); err != nil {
+			return fmt.Errorf("error patching StatefulSet spec: %v", err)
+		}
+
+		stslogger.V(1).Info("Updated StatefulSet spec",
+			"name", existingSts.Name,
+			"namespace", existingSts.Namespace,
+			"rollingUpdate", needsRollingUpdate)
+	}
+
+	stslogger.V(1).Info("syncStatefulSetSpec end")
 	return nil
 }

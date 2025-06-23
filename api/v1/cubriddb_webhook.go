@@ -60,6 +60,7 @@ func (c *CubridDB) Default() {
 		c.initAffinity,
 		c.initUpdateStrategy,
 		c.initCMSService,
+		c.initHAPort,
 	}
 
 	for _, fn := range defaultFns {
@@ -80,6 +81,7 @@ func (c *CubridDB) ValidateCreate() (admission.Warnings, error) {
 		c.validateCubridDBByRefName,
 		c.validateCMSService,
 		c.validateBrokerServicePort,
+		c.validateHAPort,
 	}
 
 	for _, fn := range validateFns {
@@ -389,4 +391,29 @@ func (c *CubridDB) initUpdateStrategy() {
 
 func (c *CubridDB) initCMSService() {
 	c.InitCMSService()
+}
+
+func (c *CubridDB) initHAPort() {
+	c.InitHAPort()
+}
+
+func (c *CubridDB) validateHAPort() error {
+	cubriddblog.Info("validateHAPort", "name", c.Name)
+
+	if c.Spec.HAPort == nil {
+		return nil
+	}
+
+	if c.Spec.HAPort.Port != nil {
+		if *c.Spec.HAPort.Port < 1 || *c.Spec.HAPort.Port > 65535 {
+			return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
+				field.Invalid(field.NewPath("spec", "haPort", "port"),
+					*c.Spec.HAPort.Port,
+					"port must be between 1 and 65535",
+				),
+			})
+		}
+	}
+
+	return nil
 }

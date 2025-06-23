@@ -48,21 +48,6 @@ func CreateServiceAccount(clientset *kubernetes.Clientset, name, namespace strin
 	return clientset.CoreV1().ServiceAccounts(namespace).Create(context.TODO(), serviceAccount, metav1.CreateOptions{})
 }
 
-// DeleteClusterRole deletes a ClusterRole with the given name
-func DeleteClusterRole(clientset *kubernetes.Clientset, name string) error {
-	return clientset.RbacV1().ClusterRoles().Delete(context.TODO(), name, metav1.DeleteOptions{})
-}
-
-// DeleteClusterRoleBinding deletes a ClusterRoleBinding with the given name
-func DeleteClusterRoleBinding(clientset *kubernetes.Clientset, name string) error {
-	return clientset.RbacV1().ClusterRoleBindings().Delete(context.TODO(), name, metav1.DeleteOptions{})
-}
-
-// DeleteServiceAccount deletes a ServiceAccount with the given name and namespace
-func DeleteServiceAccount(clientset *kubernetes.Clientset, name, namespace string) error {
-	return clientset.CoreV1().ServiceAccounts(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-}
-
 // ReconcileRBACResources creates or updates RBAC resources (ServiceAccount, ClusterRole, ClusterRoleBinding)
 // for a given namespace. It ensures that all necessary RBAC resources exist and are properly configured.
 func ReconcileRBACResources(clientset *kubernetes.Clientset, namespace string) error {

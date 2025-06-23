@@ -102,6 +102,9 @@ func (m *IngressManager) ReconcileIngress(ctx context.Context, cubridDB *cubridv
 	// Define ingress name at the beginning
 	ingressName := fmt.Sprintf(DEF.INGRESS_CMS_INGRESS_NAME, cubridDB.Name, cubridDB.Namespace)
 
+	// Get CMS port from CR spec
+	cmsPort := cubridDB.GetCMSPort()
+
 	// Get all pods for this CubridDB
 	podList := &corev1.PodList{}
 	if err := m.List(ctx, podList, client.InNamespace(cubridDB.Namespace), client.MatchingLabels{"app": cubridDB.Name}); err != nil {
@@ -127,7 +130,7 @@ func (m *IngressManager) ReconcileIngress(ctx context.Context, cubridDB *cubridv
 								Service: &networkingv1.IngressServiceBackend{
 									Name: serviceName,
 									Port: networkingv1.ServiceBackendPort{
-										Number: 8001,
+										Number: cmsPort,
 									},
 								},
 							},
@@ -182,6 +185,9 @@ func (m *IngressManager) UpdateIngressRules(ctx context.Context, cubridDB *cubri
 		return fmt.Errorf("failed to get Ingress: %v", err)
 	}
 
+	// Get CMS port from CR spec
+	cmsPort := cubridDB.GetCMSPort()
+
 	// Get all pods for this CubridDB
 	podList := &corev1.PodList{}
 	if err := m.List(ctx, podList, client.InNamespace(cubridDB.Namespace), client.MatchingLabels{"app": cubridDB.Name}); err != nil {
@@ -206,7 +212,7 @@ func (m *IngressManager) UpdateIngressRules(ctx context.Context, cubridDB *cubri
 								Service: &networkingv1.IngressServiceBackend{
 									Name: serviceName,
 									Port: networkingv1.ServiceBackendPort{
-										Number: 8001,
+										Number: cmsPort,
 									},
 								},
 							},
@@ -248,17 +254,33 @@ func (m *IngressManager) createOrUpdateIngress(ctx context.Context, ingress *net
 			return err
 		}
 		// Create new Ingress
+		ingresslog.Info("Creating new Ingress", "name", ingress.Name, "namespace", ingress.Namespace)
 		return m.Create(ctx, ingress)
 	}
 
 	// Check if there are any changes
-	if !reflect.DeepEqual(existing.Spec, ingress.Spec) || !reflect.DeepEqual(existing.Labels, ingress.Labels) {
-		ingresslog.Info("Update existing Ingress", "name", ingress.Name, "namespace", ingress.Namespace)
-		// Update existing Ingress
-		ingress.ResourceVersion = existing.ResourceVersion
-		return m.Update(ctx, ingress)
+	if reflect.DeepEqual(existing.Spec, ingress.Spec) && reflect.DeepEqual(existing.Labels, ingress.Labels) && reflect.DeepEqual(existing.Annotations, ingress.Annotations) {
+		ingresslog.V(1).Info("Ingress unchanged, skipping update", "name", ingress.Name, "namespace", ingress.Namespace)
+		return nil
 	}
-	return nil
+
+	ingresslog.Info("Updating existing Ingress", "name", ingress.Name, "namespace", ingress.Namespace)
+
+	// Update existing Ingress by patching only the changed fields
+	patch := client.MergeFrom(existing.DeepCopy())
+
+	// Update only the fields that have changed
+	if !reflect.DeepEqual(existing.Spec, ingress.Spec) {
+		existing.Spec = ingress.Spec
+	}
+	if !reflect.DeepEqual(existing.Labels, ingress.Labels) {
+		existing.Labels = ingress.Labels
+	}
+	if !reflect.DeepEqual(existing.Annotations, ingress.Annotations) {
+		existing.Annotations = ingress.Annotations
+	}
+
+	return m.Patch(ctx, existing, patch)
 }
 
 // Helper functions

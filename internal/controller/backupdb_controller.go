@@ -599,15 +599,3 @@ func getBackupDBCommand(filePath, args string) []string {
 	command := fmt.Sprintf("$CUBRID/%s %s", filePath, args)
 	return []string{"sh", "-c", command}
 }
-
-func getExitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-
-	if exitErr, ok := err.(exec.ExitError); ok {
-		return exitErr.ExitStatus() // exit code
-	}
-
-	return -1
-}

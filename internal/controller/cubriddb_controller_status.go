@@ -41,6 +41,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	listStatus = make([]string, 0)
 
 	currentStatusWithoutLastUpdated := cubriddb.Status.DeepCopy()
+	currentStatusWithoutLastUpdated.LastUpdated = metav1.Time{}
 
 	if cubriddb.IsHAEnabled() {
 		var responseMap map[string]interface{}
@@ -70,7 +71,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 
 			status, errCode := r.isResponseStatus(responseMap)
 			if errCode != nil {
-				cubriddblog.Error(errCode, "Error checking response status")
+				cubriddblog.V(1).Info("Error checking response status", "error", errCode)
 				continue
 			}
 
@@ -97,13 +98,11 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 		if isError {
 			cubriddb.Status.HaMode = DEF.HAMODE_ON
 			cubriddb.Status.NodeLists = []string{fmt.Sprintf("%s: %s", cubriddb.Name, DEF.HAMODE_UNKONW)}
-			cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
 			cubriddb.Status.CurrentMaster = DEF.HAMODE_UNKONW
 		} else {
 
 			cubriddb.Status.HaMode = DEF.HAMODE_ON
 			cubriddb.Status.NodeLists = listStatus
-			cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
 
 			for _, nodeStatus := range listStatus {
 				parts := strings.Split(nodeStatus, ": ")
@@ -115,15 +114,12 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 		}
 	} else {
 		cubriddb.Status.HaMode = DEF.HAMODE_OFF
-		cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
 		cubriddb.Status.NodeLists = []string{fmt.Sprintf("%s", DEF.HAMODE_STANDALONE)}
 		cubriddb.Status.CurrentMaster = cubriddb.Name
 	}
 
 	newStatusWithoutLastUpdated := cubriddb.Status.DeepCopy()
 	newStatusWithoutLastUpdated.LastUpdated = metav1.Time{}
-
-	currentStatusWithoutLastUpdated.LastUpdated = metav1.Time{}
 
 	if currentStatusWithoutLastUpdated.NodeLists == nil {
 		currentStatusWithoutLastUpdated.NodeLists = []string{}
@@ -137,6 +133,10 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 			"name", cubriddb.Name, "namespace", cubriddb.Namespace)
 		return ctrl.Result{}, nil
 	}
+
+	cubriddblog.V(1).Info("Status is changed, updating status",
+		"name", cubriddb.Name, "namespace", cubriddb.Namespace)
+	cubriddb.Status.LastUpdated = metav1.Time{Time: time.Now()}
 
 	if err := r.Status().Update(ctx, cubriddb); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update CubridDB status: %v", err)
