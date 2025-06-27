@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"sort"
@@ -20,11 +20,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-type nodeStatus struct {
-	node  string
-	state string
-}
 
 func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	ctx context.Context,
@@ -87,12 +82,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 			goto End
 		}
 
-		listStatus, errCode = parseHANodesStatus(responseMap)
-		if errCode != nil {
-			errorMessage = fmt.Errorf("failed to parse HA Mode status: %v", errCode)
-			isError = true
-			goto End
-		}
+		listStatus = parseHANodesStatus(responseMap)
 
 	End:
 		if isError {
@@ -114,7 +104,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 		}
 	} else {
 		cubriddb.Status.HaMode = DEF.HAMODE_OFF
-		cubriddb.Status.NodeLists = []string{fmt.Sprintf("%s", DEF.HAMODE_STANDALONE)}
+		cubriddb.Status.NodeLists = []string{DEF.HAMODE_STANDALONE}
 		cubriddb.Status.CurrentMaster = cubriddb.Name
 	}
 
@@ -150,7 +140,7 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 }
 
 // parseHANodesStatus parses the HA status and returns a slice of node status strings in order
-func parseHANodesStatus(result map[string]interface{}) ([]string, error) {
+func parseHANodesStatus(result map[string]interface{}) []string {
 	nodes := make(map[string]string)
 
 	// Add all existing nodes
@@ -167,13 +157,13 @@ func parseHANodesStatus(result map[string]interface{}) ([]string, error) {
 	}
 
 	// Create ordered slice of node status strings
-	var orderedNodes []string
+	orderedNodes := make([]string, 0)
 
 	// Helper function to get sorted nodes by role
 	getSortedNodesByRole := func(role string) []string {
 		var roleNodes []string
 		for node, state := range nodes {
-			if strings.ToLower(state) == strings.ToLower(role) {
+			if strings.EqualFold(state, role) {
 				roleNodes = append(roleNodes, node)
 			}
 		}
@@ -196,11 +186,12 @@ func parseHANodesStatus(result map[string]interface{}) ([]string, error) {
 		orderedNodes = append(orderedNodes, fmt.Sprintf("%s: %s", node, nodes[node]))
 	}
 
-	return orderedNodes, nil
+	return orderedNodes
 }
 
 func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string) (string, error) {
 	loginCmd := createLoginCommand(id, passwd, version)
+
 
 	resp, err := cms.SendCommand(loginCmd, httpURL)
 	if err != nil {
@@ -218,7 +209,7 @@ func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string
 		return "", fmt.Errorf("unexpected status code %d from login API", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %v", err)
 	}
@@ -233,6 +224,7 @@ func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string
 		return "", fmt.Errorf("token not found in login response")
 	}
 
+	cubriddblog.V(2).Info("Successfully logged in to CMS server", "token", token)
 	return token, nil
 }
 
@@ -241,6 +233,7 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ha_status command: %v", err)
 	}
+
 
 	resp, err := cms.SendCommand(command, httpURL)
 	if err != nil {
@@ -259,7 +252,7 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 		return nil, fmt.Errorf("unexpected status code %d from ha_status API", resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}
@@ -269,6 +262,7 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 		return nil, fmt.Errorf("failed to unmarshal ha_status response: %v", err)
 	}
 
+	cubriddblog.V(2).Info("Successfully retrieved HA status")
 	return responseMap, nil
 }
 

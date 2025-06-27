@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
+	"github.com/cubrid/cubrid-operator/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -67,10 +68,7 @@ func (r *BrokerEndpointReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				oldDB := e.ObjectOld.(*cubridv1.CubridDB)
 				newDB := e.ObjectNew.(*cubridv1.CubridDB)
-				if !reflect.DeepEqual(oldDB.Spec.Broker, newDB.Spec.Broker) {
-					return true
-				}
-				return false
+				return !reflect.DeepEqual(oldDB.Spec.Broker, newDB.Spec.Broker)
 			},
 			GenericFunc: func(e event.GenericEvent) bool {
 				return false
@@ -88,10 +86,10 @@ type BrokerStatus struct {
 }
 
 // checkPortStatus checks if the Broker port is listening
-func (r *BrokerEndpointReconciler) checkPortStatus(ctx context.Context, pod *corev1.Pod, port int32) (bool, error) {
+func (r *BrokerEndpointReconciler) checkPortStatus(pod *corev1.Pod, port int32) (bool, error) {
 	// Use netstat to check if the Broker port is listening
 	cmd := []string{"netstat", "-tln", "|", "grep", fmt.Sprintf(":%d", port)}
-	output, err := r.execCommand(ctx, pod, cmd)
+	output, err := r.execCommand(pod, cmd)
 	if err != nil {
 		// If grep doesn't find anything, it returns error
 		if strings.Contains(err.Error(), "exit status 1") {
@@ -132,19 +130,36 @@ func (r *BrokerEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		activePodIPs := []corev1.EndpointAddress{}
 		notReadyPodIPs := []corev1.EndpointAddress{}
 
-		for _, pod := range podList.Items {
-			// Skip pods that are not in Running state or without valid IP addresses
-			if pod.Status.Phase != corev1.PodRunning || !r.isValidIPAddress(pod.Status.PodIP) {
-				brokerEPlog.V(1).Info("Skipping pod - not running or no valid IP",
-					"pod", pod.Name,
-					"broker", broker.Name,
-					"phase", pod.Status.Phase,
-					"podIP", pod.Status.PodIP)
+		for i := range podList.Items {
+			// Check if pod is running and all containers are running
+			pod := &podList.Items[i]
+			_, err := util.IsPodAndContainersRunning(pod)
+			if err != nil {
+				brokerEPlog.V(1).Info("Pod not ready", "pod", pod.Name, "broker", broker.Name, "error", err.Error())
+				// If pod is not ready, add to not ready list if it has a valid IP
+				if r.isValidIPAddress(pod.Status.PodIP) {
+					notReadyPodIPs = append(notReadyPodIPs, corev1.EndpointAddress{
+						IP:       pod.Status.PodIP,
+						NodeName: &pod.Spec.NodeName,
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Name:      pod.Name,
+							Namespace: pod.Namespace,
+							UID:       pod.UID,
+						},
+					})
+				}
+				continue
+			}
+
+			// Skip pods without valid IP addresses
+			if !r.isValidIPAddress(pod.Status.PodIP) {
+				brokerEPlog.V(1).Info("Skipping pod - no valid IP", "pod", pod.Name, "broker", broker.Name, "podIP", pod.Status.PodIP)
 				continue
 			}
 
 			// Check if the port is listening
-			isActive, err := r.checkPortStatus(ctx, &pod, broker.Port)
+			isActive, err := r.checkPortStatus(pod, broker.Port)
 			if err != nil {
 				brokerEPlog.V(1).Info("Failed to check port status, treating as not ready", "pod", pod.Name, "broker", broker.Name, "error", err.Error())
 				// If we can't check status, treat as not ready
@@ -201,7 +216,7 @@ func (r *BrokerEndpointReconciler) isValidIPAddress(ip string) bool {
 }
 
 // execCommand executes a command in the pod
-func (r *BrokerEndpointReconciler) execCommand(ctx context.Context, pod *corev1.Pod, cmd []string) (string, error) {
+func (r *BrokerEndpointReconciler) execCommand(pod *corev1.Pod, cmd []string) (string, error) {
 	brokerEPlog.V(1).Info("Executing command in pod", "pod", pod.Name, "command", strings.Join(cmd, " "))
 
 	// Create exec request
@@ -227,7 +242,7 @@ func (r *BrokerEndpointReconciler) execCommand(ctx context.Context, pod *corev1.
 	var stdout, stderr bytes.Buffer
 
 	// Execute command
-	err = exec.Stream(remotecommand.StreamOptions{
+	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})

@@ -77,24 +77,77 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 
 	// Operator flags
-	rootCmd.PersistentFlags().StringVar(&operatorMetricsAddr, "metrics-bind-address", ":8080", "The address the operator metric endpoint binds to.")
-	rootCmd.PersistentFlags().StringVar(&operatorProbeAddr, "health-probe-bind-address", ":8081", "The address the operator probe endpoint binds to.")
+	rootCmd.PersistentFlags().StringVar(
+		&operatorMetricsAddr,
+		"metrics-bind-address",
+		":8080",
+		"The address the operator metric endpoint binds to.",
+	)
+	rootCmd.PersistentFlags().StringVar(
+		&operatorProbeAddr,
+		"health-probe-bind-address",
+		":8081", "The address the operator probe endpoint binds to.")
 	rootCmd.PersistentFlags().BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 
 	// Webhook flags
-	webhookCmd.Flags().StringVar(&webhookMetricsAddr, "metrics-bind-address", ":8082", "The address the webhook metric endpoint binds to.")
-	webhookCmd.Flags().StringVar(&webhookProbeAddr, "health-probe-bind-address", ":8083", "The address the webhook probe endpoint binds to.")
+	webhookCmd.Flags().StringVar(
+		&webhookMetricsAddr,
+		"metrics-bind-address",
+		":8082",
+		"The address the webhook metric endpoint binds to.",
+	)
+	webhookCmd.Flags().StringVar(
+		&webhookProbeAddr,
+		"health-probe-bind-address",
+		":8083",
+		"The address the webhook probe endpoint binds to.",
+	)
 	webhookCmd.Flags().IntVar(&webhookPort, "webhook-port", 8443, "The port the webhook server serves on.")
 	webhookCmd.Flags().StringVar(&webhookServiceName, "webhook-service-name", "", "The name of the webhook service")
-	webhookCmd.Flags().StringVar(&webhookNamespace, "webhook-namespace", "cubrid", "The namespace where the webhook server is deployed")
-	webhookCmd.Flags().StringVar(&webhookCertDir, "webhook-cert-dir", certmanager.DefaultCertificateDir, "The directory where certificates are stored")
-	webhookCmd.Flags().StringVar(&webhookCertManagerType, "webhook-cert-manager-type", "internal", "The type of cert-manager to use (internal or external)")
-	webhookCmd.Flags().StringVar(&webhookSecretName, "webhook-secret-name", "", "The name of the secret used by the webhook server")
-	webhookCmd.Flags().StringVar(&webhookMutatingName, "webhook-mutating-name", "", "The name of the webhook mutating")
-	webhookCmd.Flags().StringVar(&webhookValidatingName, "webhook-validating-name", "", "The name of the webhook validating")
-	webhookCmd.Flags().StringVar(&webhookDeploymentName, "webhook-deployment-name", "cubrid-operator-webhook-dep", "The name of the webhook deployment")
+	webhookCmd.Flags().StringVar(
+		&webhookNamespace,
+		"webhook-namespace",
+		"cubrid",
+		"The namespace where the webhook server is deployed",
+	)
+	webhookCmd.Flags().StringVar(
+		&webhookCertDir,
+		"webhook-cert-dir",
+		certmanager.DefaultCertificateDir,
+		"The directory where certificates are stored",
+	)
+	webhookCmd.Flags().StringVar(
+		&webhookCertManagerType,
+		"webhook-cert-manager-type",
+		"internal",
+		"The type of cert-manager to use (internal or external)",
+	)
+	webhookCmd.Flags().StringVar(
+		&webhookSecretName,
+		"webhook-secret-name",
+		"",
+		"The name of the secret used by the webhook server",
+	)
+	webhookCmd.Flags().StringVar(
+		&webhookMutatingName,
+		"webhook-mutating-name",
+		"",
+		"The name of the webhook mutating",
+	)
+	webhookCmd.Flags().StringVar(
+		&webhookValidatingName,
+		"webhook-validating-name",
+		"",
+		"The name of the webhook validating",
+	)
+	webhookCmd.Flags().StringVar(
+		&webhookDeploymentName,
+		"webhook-deployment-name",
+		"cubrid-operator-webhook-dep",
+		"The name of the webhook deployment",
+	)
 }
 
 var rootCmd = &cobra.Command{

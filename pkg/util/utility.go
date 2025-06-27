@@ -254,6 +254,12 @@ func UpdateCubridDB(ctx context.Context, c client.Client, pod *corev1.Pod) error
 	if *statefulSet.Spec.Replicas != cubridDB.Spec.Replication.Replicas {
 		cubridDB.Spec.Replication.Replicas = *statefulSet.Spec.Replicas
 
+		log.Log.V(1).Info(
+			"UpdateCubridDB",
+			"statefulset name", statefulSetName,
+			"replicas", cubridDB.Spec.Replication.Replicas,
+		)
+
 		if err := c.Update(ctx, &cubridDB); err != nil {
 			return fmt.Errorf("unable to update CubridDB: %v", err)
 		}
@@ -291,6 +297,23 @@ func AllContainersRunning(pod *corev1.Pod) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// IsPodRunning checks if a pod is in Running phase
+func IsPodRunning(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodRunning
+}
+
+// IsPodAndContainersRunning checks if a pod is in Running phase and all containers are running
+// This function combines pod phase check and container status check into one comprehensive check
+func IsPodAndContainersRunning(pod *corev1.Pod) (bool, error) {
+	// First check if pod is in Running phase
+	if !IsPodRunning(pod) {
+		return false, fmt.Errorf("pod %s is not in Running state (%s)", pod.Name, string(pod.Status.Phase))
+	}
+
+	// Then check if all containers are running
+	return AllContainersRunning(pod)
 }
 
 func CheckIfPodIsRunning(c client.Client, ctx context.Context, podName string, namespace string) (bool, error) {

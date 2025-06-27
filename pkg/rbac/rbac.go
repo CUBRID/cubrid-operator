@@ -12,7 +12,11 @@ import (
 )
 
 // CreateClusterRole creates a ClusterRole with the given name and rules
-func CreateClusterRole(clientset *kubernetes.Clientset, name string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
+func CreateClusterRole(
+	clientset *kubernetes.Clientset,
+	name string,
+	rules []rbacv1.PolicyRule,
+) (*rbacv1.ClusterRole, error) {
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -24,7 +28,12 @@ func CreateClusterRole(clientset *kubernetes.Clientset, name string, rules []rba
 }
 
 // CreateClusterRoleBinding creates a ClusterRoleBinding with the given name, roleRef, and subjects
-func CreateClusterRoleBinding(clientset *kubernetes.Clientset, name string, roleRef rbacv1.RoleRef, subjects []rbacv1.Subject) (*rbacv1.ClusterRoleBinding, error) {
+func CreateClusterRoleBinding(
+	clientset *kubernetes.Clientset,
+	name string,
+	roleRef rbacv1.RoleRef,
+	subjects []rbacv1.Subject,
+) (*rbacv1.ClusterRoleBinding, error) {
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

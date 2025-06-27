@@ -33,7 +33,11 @@ func CreateServiceMeta(name, namespace string, labels map[string]string) metav1.
 }
 
 // CreateServicePort creates a ServicePort configuration
-func CreateServicePort(name string, port, targetPort, nodePort int32, protocol corev1.Protocol) corev1.ServicePort {
+func CreateServicePort(
+	name string,
+	port, targetPort, nodePort int32,
+	protocol corev1.Protocol,
+) corev1.ServicePort {
 	return corev1.ServicePort{
 		Name:       name,
 		Protocol:   protocol,
@@ -44,7 +48,11 @@ func CreateServicePort(name string, port, targetPort, nodePort int32, protocol c
 }
 
 // CreateServiceSpec creates a ServiceSpec configuration
-func CreateServiceSpec(serviceType corev1.ServiceType, ports []corev1.ServicePort, selector map[string]string) corev1.ServiceSpec {
+func CreateServiceSpec(
+	serviceType corev1.ServiceType,
+	ports []corev1.ServicePort,
+	selector map[string]string,
+) corev1.ServiceSpec {
 	return corev1.ServiceSpec{
 		Type:     serviceType,
 		Ports:    ports,
@@ -67,7 +75,11 @@ func CreateBrokerSelector(appName string) map[string]string {
 }
 
 // CreateServiceLabels creates labels for a service
-func CreateServiceLabels(appName string, serviceType ServiceType, additionalLabels map[string]string) map[string]string {
+func CreateServiceLabels(
+	appName string,
+	serviceType ServiceType,
+	additionalLabels map[string]string,
+) map[string]string {
 	labels := map[string]string{
 		"app":     appName,
 		"service": string(serviceType),
@@ -81,7 +93,10 @@ func CreateServiceLabels(appName string, serviceType ServiceType, additionalLabe
 // ValidateNodePort validates if the given port is within the NodePort range.
 func ValidateNodePort(port int32) error {
 	if port < DEF.NodePortRangeMin || port > DEF.NodePortRangeMax {
-		return fmt.Errorf("port %d is not within the valid NodePort range (%d-%d)", port, DEF.NodePortRangeMin, DEF.NodePortRangeMax)
+		return fmt.Errorf(
+			"port %d is not within the valid NodePort range (%d-%d)",
+			port, DEF.NodePortRangeMin, DEF.NodePortRangeMax,
+		)
 	}
 	return nil
 }
@@ -100,7 +115,12 @@ func ValidateNodePortRange(startPort int32, count int32) error {
 }
 
 // CreateHeadlessServicePort creates a service port for headless service
-func CreateHeadlessServicePort(name string, port int32, targetPort int32, protocol corev1.Protocol) corev1.ServicePort {
+func CreateHeadlessServicePort(
+	name string,
+	port int32,
+	targetPort int32,
+	protocol corev1.Protocol,
+) corev1.ServicePort {
 	return corev1.ServicePort{
 		Name:       name,
 		Port:       port,
@@ -164,7 +184,12 @@ func IsPortInUse(ctx context.Context, client client.Client, port int32, excludeS
 // It checks if the port is already in use by any service in any namespace.
 // If the specified port is available, it returns that port.
 // Otherwise, it returns the next available port.
-func FindNextAvailablePort(ctx context.Context, client client.Client, startPort int32, excludeServiceName string) (int32, error) {
+func FindNextAvailablePort(
+	ctx context.Context,
+	client client.Client,
+	startPort int32,
+	excludeServiceName string,
+) (int32, error) {
 	// First validate if the start port is within the NodePort range
 	if err := ValidateNodePort(startPort); err != nil {
 		return 0, err
@@ -204,7 +229,10 @@ func FindNextAvailablePort(ctx context.Context, client client.Client, startPort 
 
 	// Check if we found a valid port
 	if port > DEF.NodePortRangeMax {
-		return 0, fmt.Errorf("no available ports found in the NodePort range (%d-%d)", DEF.NodePortRangeMin, DEF.NodePortRangeMax)
+		return 0, fmt.Errorf(
+			"no available ports found in the NodePort range (%d-%d)",
+			DEF.NodePortRangeMin, DEF.NodePortRangeMax,
+		)
 	}
 
 	return port, nil

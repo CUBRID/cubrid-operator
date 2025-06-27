@@ -163,7 +163,7 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 	}
 
 	// Handle StatefulSet spec updates (image, updateStrategy, etc.)
-	if err := r.syncStatefulSetSpec(ctx, cubridDB, &existingSts, desiredSTS); err != nil {
+	if err := r.syncStatefulSetSpec(ctx, &existingSts, desiredSTS); err != nil {
 		return fmt.Errorf("error synchronizing StatefulSet spec: %v", err)
 	}
 
@@ -171,7 +171,11 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 }
 
 // syncReplicas handles the synchronization of replicas between StatefulSet and CubridDB CR
-func (r *StatefulSetManager) syncReplicas(ctx context.Context, cubridDB *cubridv1.CubridDB, existingSts *appsv1.StatefulSet) error {
+func (r *StatefulSetManager) syncReplicas(
+	ctx context.Context,
+	cubridDB *cubridv1.CubridDB,
+	existingSts *appsv1.StatefulSet,
+) error {
 	currentReplicas := *existingSts.Spec.Replicas
 	desiredReplicas := cubridDB.Spec.Replication.Replicas
 
@@ -190,7 +194,7 @@ func (r *StatefulSetManager) syncReplicas(ctx context.Context, cubridDB *cubridv
 		if lastReplicas == desiredReplicas {
 			// StatefulSet was changed (e.g., kubectl scale)
 			// Validate replicas change
-			if err := r.validateReplicasChange(ctx, cubridDB, currentReplicas); err != nil {
+			if err := r.validateReplicasChange(cubridDB, currentReplicas); err != nil {
 				return fmt.Errorf("invalid replicas change: %v", err)
 			}
 
@@ -207,7 +211,7 @@ func (r *StatefulSetManager) syncReplicas(ctx context.Context, cubridDB *cubridv
 		} else {
 			// CubridDB CR was changed
 			// Validate replicas change
-			if err := r.validateReplicasChange(ctx, cubridDB, desiredReplicas); err != nil {
+			if err := r.validateReplicasChange(cubridDB, desiredReplicas); err != nil {
 				return fmt.Errorf("invalid replicas change: %v", err)
 			}
 
@@ -240,7 +244,7 @@ func (r *StatefulSetManager) syncReplicas(ctx context.Context, cubridDB *cubridv
 }
 
 // validateReplicasChange validates the replicas change request
-func (r *StatefulSetManager) validateReplicasChange(ctx context.Context, cubridDB *cubridv1.CubridDB, desiredReplicas int32) error {
+func (r *StatefulSetManager) validateReplicasChange(cubridDB *cubridv1.CubridDB, desiredReplicas int32) error {
 	if cubridDB.IsHAEnabled() {
 		// HA mode: replicas must be greater than 0
 		if desiredReplicas <= 0 {
@@ -257,7 +261,11 @@ func (r *StatefulSetManager) validateReplicasChange(ctx context.Context, cubridD
 }
 
 // syncStatefulSetSpec handles StatefulSet spec updates like image, updateStrategy, etc.
-func (r *StatefulSetManager) syncStatefulSetSpec(ctx context.Context, cubridDB *cubridv1.CubridDB, existingSts *appsv1.StatefulSet, desiredSts *appsv1.StatefulSet) error {
+func (r *StatefulSetManager) syncStatefulSetSpec(
+	ctx context.Context,
+	existingSts *appsv1.StatefulSet,
+	desiredSts *appsv1.StatefulSet,
+) error {
 	// Check if any spec changes are needed
 	needsUpdate := false
 	needsRollingUpdate := false

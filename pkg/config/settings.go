@@ -33,7 +33,7 @@ const (
 	Volume_Size_50Gi     = "50Gi"
 	Volume_Size_100Gi    = "100Gi"
 
-	DefaultStorageClassName = "longhorn" // standard로 변경이 필요함
+	DefaultStorageClassName = "standard" // needs to be changed to standard
 
 	// initcontainer
 	InitCopyConfContainerName     = "init-copy-conf"
@@ -68,7 +68,7 @@ const (
 
 	// CMS Service
 	SVC_NAME_SUFFIX          = "headless"
-	SVC_CMS_NODEPORT         = "%s-cms-%d" // <cubriddb-name>-cms-<pod-index>
+	SVC_CMS_NODEPORT         = "%s-%s-cms-%d" // <cubriddb-name>-<namespace>-cms-<pod-index>
 	SVC_CMS_START_NODE_PORT  = 31000
 	SVC_CMS_ENABLED          = true
 	SVC_TYPE_NODE_PORT       = (corev1.ServiceTypeClusterIP)
@@ -81,7 +81,7 @@ const (
 	SVC_CMS_PORT_NAME        = "cubrid-cms-port"
 
 	// Ingress
-	SVC_INGRESS_CMS_NAME     = "%s-%s-cms-svc"
+	INGRESS_CMS_SVC_NAME     = "%s-%s-cms-svc"        // <pod-name>-<namespace>-cms-svc
 	INGRESS_CMS_INGRESS_NAME = "%s-%s-cms-ingress"    // <cubridDB-name>-<namespace>-cms-ingress
 	INGRESS_HOST_NAME        = "%s.%s.cms.cubrid.com" // <pod-name>.<namespace>.cms.cubrid.com
 

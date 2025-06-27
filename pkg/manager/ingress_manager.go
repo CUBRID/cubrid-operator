@@ -64,7 +64,7 @@ func (m *IngressManager) cleanupIngressAndServices(ctx context.Context, cubridDB
 	ingresslog.Info("Deleted svc", "num of svc", len(podList.Items))
 
 	for _, pod := range podList.Items {
-		serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, pod.Name, pod.Namespace)
+		serviceName := fmt.Sprintf(DEF.INGRESS_CMS_SVC_NAME, pod.Name, pod.Namespace)
 		service := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
@@ -107,16 +107,21 @@ func (m *IngressManager) ReconcileIngress(ctx context.Context, cubridDB *cubridv
 
 	// Get all pods for this CubridDB
 	podList := &corev1.PodList{}
-	if err := m.List(ctx, podList, client.InNamespace(cubridDB.Namespace), client.MatchingLabels{"app": cubridDB.Name}); err != nil {
+	if err := m.List(
+		ctx,
+		podList,
+		client.InNamespace(cubridDB.Namespace),
+		client.MatchingLabels{"app": cubridDB.Name},
+	); err != nil {
 		return fmt.Errorf("failed to list pods: %v", err)
 	}
 
 	// Create initial rules based on existing pods
 	ingresslog.V(1).Info("Creating initial rules based on existing pods")
-	var rules []networkingv1.IngressRule
+	rules := make([]networkingv1.IngressRule, 0, len(podList.Items))
 	for _, pod := range podList.Items {
 		hostName := fmt.Sprintf(DEF.INGRESS_HOST_NAME, pod.Name, cubridDB.Namespace)
-		serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, pod.Name, cubridDB.Namespace)
+		serviceName := fmt.Sprintf(DEF.INGRESS_CMS_SVC_NAME, pod.Name, cubridDB.Namespace)
 
 		rule := networkingv1.IngressRule{
 			Host: hostName,
@@ -190,15 +195,20 @@ func (m *IngressManager) UpdateIngressRules(ctx context.Context, cubridDB *cubri
 
 	// Get all pods for this CubridDB
 	podList := &corev1.PodList{}
-	if err := m.List(ctx, podList, client.InNamespace(cubridDB.Namespace), client.MatchingLabels{"app": cubridDB.Name}); err != nil {
+	if err := m.List(
+		ctx,
+		podList,
+		client.InNamespace(cubridDB.Namespace),
+		client.MatchingLabels{"app": cubridDB.Name},
+	); err != nil {
 		return fmt.Errorf("failed to list pods: %v", err)
 	}
 
 	// Update rules based on pods
-	var newRules []networkingv1.IngressRule
+	newRules := make([]networkingv1.IngressRule, 0, len(podList.Items))
 	for _, pod := range podList.Items {
 		hostName := fmt.Sprintf(DEF.INGRESS_HOST_NAME, pod.Name, cubridDB.Namespace)
-		serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, pod.Name, cubridDB.Namespace)
+		serviceName := fmt.Sprintf(DEF.INGRESS_CMS_SVC_NAME, pod.Name, cubridDB.Namespace)
 
 		rule := networkingv1.IngressRule{
 			Host: hostName,
@@ -259,7 +269,9 @@ func (m *IngressManager) createOrUpdateIngress(ctx context.Context, ingress *net
 	}
 
 	// Check if there are any changes
-	if reflect.DeepEqual(existing.Spec, ingress.Spec) && reflect.DeepEqual(existing.Labels, ingress.Labels) && reflect.DeepEqual(existing.Annotations, ingress.Annotations) {
+	if reflect.DeepEqual(existing.Spec, ingress.Spec) &&
+		reflect.DeepEqual(existing.Labels, ingress.Labels) &&
+		reflect.DeepEqual(existing.Annotations, ingress.Annotations) {
 		ingresslog.V(1).Info("Ingress unchanged, skipping update", "name", ingress.Name, "namespace", ingress.Namespace)
 		return nil
 	}

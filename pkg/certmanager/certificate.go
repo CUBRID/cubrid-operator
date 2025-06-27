@@ -138,9 +138,10 @@ func (m *Manager) isPodReady() (bool, error) {
 
 	// Find the newest pod
 	var newestPod *corev1.Pod
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
+		pod := &podList.Items[i]
 		if newestPod == nil || pod.CreationTimestamp.After(newestPod.CreationTimestamp.Time) {
-			newestPod = &pod
+			newestPod = pod
 		}
 	}
 
@@ -202,7 +203,7 @@ func (m *Manager) Start() error {
 		Name:      m.config.WebhookSecretName,
 	}, secret)
 
-	if err == nil && secret != nil {
+	if err == nil {
 		// If Secret exists, validate certificates
 		if certData, ok := secret.Data["tls.crt"]; ok && len(certData) > 0 {
 			if keyData, ok := secret.Data["tls.key"]; ok && len(keyData) > 0 {
@@ -297,7 +298,7 @@ func (m *Manager) isValidCertificate(certData, keyData, caData []byte) bool {
 		return false
 	}
 
-	// 서버 인증서가 CA 인증서로 서명되었는지 확인
+	// Verify that the server certificate is signed by the CA certificate
 	roots := x509.NewCertPool()
 	roots.AddCert(caCert)
 	_, err = cert.Verify(x509.VerifyOptions{
@@ -413,7 +414,13 @@ func (m *Manager) createSelfSignedCertificate() error {
 	// Save server private key
 	logger.Info("saving server private key")
 	keyBuffer := new(bytes.Buffer)
-	if err := pem.Encode(keyBuffer, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverPrivateKey)}); err != nil {
+	if err := pem.Encode(keyBuffer, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(serverPrivateKey),
+		Headers: map[string]string{
+			"x-pem-header": "true",
+		},
+	}); err != nil {
 		logger.Error(err, "Unable to encode server private key")
 		return err
 	}
@@ -434,7 +441,11 @@ func (m *Manager) updateWebhookConfiguration() error {
 
 	// Update MutatingWebhookConfiguration
 	mutatingWebhook := &admissionv1.MutatingWebhookConfiguration{}
-	if err := m.client.Get(context.Background(), client.ObjectKey{Name: m.config.WebhookMutatingName}, mutatingWebhook); err != nil {
+	if err := m.client.Get(
+		context.Background(),
+		client.ObjectKey{Name: m.config.WebhookMutatingName},
+		mutatingWebhook,
+	); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get MutatingWebhookConfiguration: %v", err)
 		}
@@ -451,7 +462,11 @@ func (m *Manager) updateWebhookConfiguration() error {
 
 	// Update ValidatingWebhookConfiguration
 	validatingWebhook := &admissionv1.ValidatingWebhookConfiguration{}
-	if err := m.client.Get(context.Background(), client.ObjectKey{Name: m.config.WebhookValidatingName}, validatingWebhook); err != nil {
+	if err := m.client.Get(
+		context.Background(),
+		client.ObjectKey{Name: m.config.WebhookValidatingName},
+		validatingWebhook,
+	); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get ValidatingWebhookConfiguration: %v", err)
 		}
@@ -510,7 +525,11 @@ func (m *Manager) certificatesExistAndValid() (bool, error) {
 	}
 
 	if time.Until(x509Cert.NotAfter) < oneMonth {
-		logger.Info("Certificate is near expiration", "notAfter", x509Cert.NotAfter, "timeUntil", time.Until(x509Cert.NotAfter))
+		logger.Info(
+			"Certificate is near expiration",
+			"notAfter", x509Cert.NotAfter,
+			"timeUntil", time.Until(x509Cert.NotAfter),
+		)
 		return false, nil
 	}
 

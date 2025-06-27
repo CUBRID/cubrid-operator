@@ -88,8 +88,6 @@ const (
 
 // getServiceManagementType determines how a service should be managed
 func getServiceManagementType(serviceName string, cubridDB *cubridv1.CubridDB) ServiceManagementType {
-	// All services are now managed by CR (have CR configuration)
-	// Broker services are managed by CR
 	if isBrokerService(serviceName, cubridDB) {
 		return ServiceManagedByCR
 	}
@@ -100,12 +98,16 @@ func getServiceManagementType(serviceName string, cubridDB *cubridv1.CubridDB) S
 	}
 
 	// Ingress CMS services are managed by CR
-	if isIngressCMSService(serviceName, cubridDB) {
+	if isIngressCMSService(serviceName) {
 		return ServiceManagedByCR
 	}
 
-	// Default to CR management for safety
-	return ServiceManagedByCR
+	// NodePort CMS services are managed by CR
+	if isNodePortCMSService(serviceName, cubridDB) {
+		return ServiceManagedByCR
+	}
+
+	return ServiceManagedByUser
 }
 
 // isBrokerService checks if the service is a broker service
@@ -124,9 +126,14 @@ func isHeadlessService(serviceName string, cubridDB *cubridv1.CubridDB) bool {
 }
 
 // isIngressCMSService checks if the service is an ingress CMS service
-func isIngressCMSService(serviceName string, cubridDB *cubridv1.CubridDB) bool {
+func isIngressCMSService(serviceName string) bool {
 	// Check if service name ends with "-cms-svc" pattern
 	return strings.HasSuffix(serviceName, "-cms-svc")
+}
+
+// isNodePortCMSService checks if the service is a NodePort CMS service
+func isNodePortCMSService(serviceName string, cubridDB *cubridv1.CubridDB) bool {
+	return strings.HasPrefix(serviceName, fmt.Sprintf("%s-%s-cms", cubridDB.Name, cubridDB.Namespace))
 }
 
 // getServiceModificationGuide returns guidance for users on how to modify a service
@@ -145,27 +152,14 @@ func getServiceModificationGuide(serviceName string, cubridDB *cubridv1.CubridDB
 	}
 }
 
-// logServiceManagementInfo logs information about service management for users
-func (m *ServiceManager) logServiceManagementInfo(ctx context.Context, cubridDB *cubridv1.CubridDB) {
-	svclogger.Info("Service Management Information",
-		"cubriddb", cubridDB.Name,
-		"note", "Different services have different modification methods")
-
-	// Log guidance for each service type
-	for _, broker := range cubridDB.Spec.Broker {
-		guide := getServiceModificationGuide(broker.Name, cubridDB)
-		svclogger.Info("Service modification guide", "service", broker.Name, "guide", guide)
-	}
-
-	// Log guidance for headless service
-	headlessServiceName := res.CreateHeadlessServiceName(cubridDB.Name)
-	guide := getServiceModificationGuide(headlessServiceName, cubridDB)
-	svclogger.Info("Service modification guide", "service", headlessServiceName, "guide", guide)
-}
-
 // protectCRManagedService ensures CR-managed services are not modified directly by user
 // If user modifies a CR-managed service directly, it will be restored to CR state
-func (m *ServiceManager) protectCRManagedService(ctx context.Context, serviceName string, cubridDB *cubridv1.CubridDB, desiredSvc *corev1.Service) error {
+func (m *ServiceManager) protectCRManagedService(
+	ctx context.Context,
+	serviceName string,
+	cubridDB *cubridv1.CubridDB,
+	desiredSvc *corev1.Service,
+) error {
 	managementType := getServiceManagementType(serviceName, cubridDB)
 
 	if managementType == ServiceManagedByUser {
@@ -289,7 +283,12 @@ func (m *ServiceManager) reconcileHeadlessService(ctx context.Context, cubridDB 
 
 // reconcileNodePortService handles the common pattern for NodePort services
 // It includes special logic for NodePort management
-func (m *ServiceManager) reconcileNodePortService(ctx context.Context, serviceName, namespace string, desiredSvc *corev1.Service, startNodePort int32) error {
+func (m *ServiceManager) reconcileNodePortService(
+	ctx context.Context,
+	serviceName, namespace string,
+	desiredSvc *corev1.Service,
+	startNodePort int32,
+) error {
 	// Check if service exists and get its current state
 	existingSvc := &corev1.Service{}
 	err := m.Get(ctx, types.NamespacedName{
@@ -392,13 +391,17 @@ func (m *ServiceManager) reconcileNodePortCMSServices(ctx context.Context, cubri
 		// svclogger.Info("nginx ingress controller found, cleaning up NodePort services")
 		// Get all pods for this CubridDB
 		podList := &corev1.PodList{}
-		if err := m.List(ctx, podList, client.InNamespace(cubridDB.Namespace), client.MatchingLabels{"app": cubridDB.Name}); err != nil {
+		if err := m.List(
+			ctx, podList,
+			client.InNamespace(cubridDB.Namespace),
+			client.MatchingLabels{"app": cubridDB.Name},
+		); err != nil {
 			return fmt.Errorf("failed to list pods: %v", err)
 		}
 
 		// Delete NodePort service for each pod
 		for i := 0; i < int(cubridDB.Spec.Replication.Replicas); i++ {
-			serviceName := fmt.Sprintf(DEF.SVC_CMS_NODEPORT, cubridDB.Name, i)
+			serviceName := fmt.Sprintf(DEF.SVC_CMS_NODEPORT, cubridDB.Name, cubridDB.Namespace, i)
 			service := &corev1.Service{}
 			err := m.Get(ctx, types.NamespacedName{
 				Name:      serviceName,
@@ -446,7 +449,7 @@ func (m *ServiceManager) reconcileNodePortCMSServices(ctx context.Context, cubri
 			return err
 		}
 
-		serviceName := fmt.Sprintf(DEF.SVC_CMS_NODEPORT, cubridDB.Name, i)
+		serviceName := fmt.Sprintf(DEF.SVC_CMS_NODEPORT, cubridDB.Name, cubridDB.Namespace, i)
 
 		// Define desired service ports
 		desiredPorts := []corev1.ServicePort{
@@ -528,7 +531,11 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 
 		// Set StatefulSet as the owner of the service
 		if err := controllerutil.SetControllerReference(cubridDB, desiredSvc, m.Scheme); err != nil {
-			return fmt.Errorf("failed to set controller reference for broker service %s: %v", broker.Name, err)
+			return fmt.Errorf(
+				"failed to set controller reference for broker service %s: %v",
+				broker.Name,
+				err,
+			)
 		}
 
 		// Use protection logic for CR-managed services
@@ -540,7 +547,11 @@ func (m *ServiceManager) reconcileBrokerServices(ctx context.Context, cubridDB *
 	return nil
 }
 
-func (m *ServiceManager) cleanupServices(ctx context.Context, cubridDB *cubridv1.CubridDB, serviceType res.ServiceType) error {
+func (m *ServiceManager) cleanupServices(
+	ctx context.Context,
+	cubridDB *cubridv1.CubridDB,
+	serviceType res.ServiceType,
+) error {
 	services := &corev1.ServiceList{}
 	if err := m.List(ctx, services,
 		client.InNamespace(cubridDB.Namespace),
@@ -557,82 +568,6 @@ func (m *ServiceManager) cleanupServices(ctx context.Context, cubridDB *cubridv1
 		}
 	}
 
-	return nil
-}
-
-// ReconcileSingleIngressCMSService reconciles the CMS service for a single pod
-func (m *ServiceManager) ReconcileSingleIngressCMSService(ctx context.Context, cubridDB *cubridv1.CubridDB, pod *corev1.Pod) error {
-	svclogger.Info("ReconcileSingleIngressCMSService", "cubridDB", cubridDB.Name, "pod", pod.Name)
-
-	// Create CMS service for the pod
-	serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, pod.Name, cubridDB.Namespace)
-
-	// Get CMS port from CR spec (unified port for all CMS services)
-	cmsPort := cubridDB.GetCMSPort()
-	svclogger.Info("cmsPort", "cmsPort", cmsPort)
-
-	// Define desired service metadata
-	desiredMeta := metav1.ObjectMeta{
-		Name:      serviceName,
-		Namespace: pod.Namespace,
-		Labels: map[string]string{
-			"app": "cubrid",
-		},
-	}
-
-	// Define desired service spec
-	desiredSpec := corev1.ServiceSpec{
-		Type:      corev1.ServiceTypeClusterIP, // Explicitly set service type
-		ClusterIP: "None",                      // Headless service
-		Selector: map[string]string{
-			"statefulset.kubernetes.io/pod-name": pod.Name,
-		},
-		Ports: []corev1.ServicePort{
-			{
-				Name:       "cms-port",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       cmsPort,
-				TargetPort: intstr.FromInt(int(cmsPort)),
-			},
-		},
-	}
-
-	// Create desired service
-	desiredSvc := &corev1.Service{
-		ObjectMeta: desiredMeta,
-		Spec:       desiredSpec,
-	}
-
-	// Set Pod as the owner of the service for automatic cleanup when pod is deleted
-	// This ensures that when a pod is deleted, its associated service is automatically deleted
-	if err := controllerutil.SetControllerReference(pod, desiredSvc, m.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference for ingress CMS service %s: %v", serviceName, err)
-	}
-
-	// Use protection logic for CR-managed services
-	return m.protectCRManagedService(ctx, serviceName, cubridDB, desiredSvc)
-}
-
-// DeleteSingleIngressCMSService deletes the CMS service for a single pod
-func (m *ServiceManager) DeleteSingleIngressCMSService(ctx context.Context, cubridDB *cubridv1.CubridDB, pod *corev1.Pod) error {
-	svclogger.Info("DeleteSingleIngressCMSService", "cubridDB", cubridDB.Name, "pod", pod.Name)
-
-	serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, pod.Name, pod.Namespace)
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: pod.Namespace,
-		},
-	}
-
-	if err := m.Delete(ctx, service); err != nil {
-		if errors.IsNotFound(err) {
-			return nil // Service doesn't exist, nothing to delete
-		}
-		return fmt.Errorf("error deleting service: %v", err)
-	}
-
-	svclogger.Info("Deleted CMS service for Ingress", "name", service.Name)
 	return nil
 }
 
@@ -683,7 +618,7 @@ func (m *ServiceManager) cleanupIngressCMSServices(ctx context.Context, cubridDB
 
 	// Delete services that match the ingress CMS service pattern and belong to this CubridDB
 	for _, service := range serviceList.Items {
-		if isIngressCMSService(service.Name, cubridDB) {
+		if isIngressCMSService(service.Name) {
 			// Extract pod name from service name
 			// Service name format: {pod-name}-{namespace}-cms-svc
 			// Example: my-cubrid-0-default-cms-svc
@@ -714,11 +649,15 @@ func (m *ServiceManager) cleanupIngressCMSServices(ctx context.Context, cubridDB
 }
 
 // createIngressCMSServiceForReplica creates an Ingress CMS service for a specific replica
-func (m *ServiceManager) createIngressCMSServiceForReplica(ctx context.Context, cubridDB *cubridv1.CubridDB, podName string) error {
+func (m *ServiceManager) createIngressCMSServiceForReplica(
+	ctx context.Context,
+	cubridDB *cubridv1.CubridDB,
+	podName string,
+) error {
 	svclogger.V(1).Info("Creating ingress CMS service for replica", "cubridDB", cubridDB.Name, "podName", podName)
 
 	// Create CMS service for the replica
-	serviceName := fmt.Sprintf(DEF.SVC_INGRESS_CMS_NAME, podName, cubridDB.Namespace)
+	serviceName := fmt.Sprintf(DEF.INGRESS_CMS_SVC_NAME, podName, cubridDB.Namespace)
 
 	// Get CMS port from CR spec (unified port for all CMS services)
 	cmsPort := cubridDB.GetCMSPort()
@@ -783,7 +722,7 @@ func (m *ServiceManager) cleanupOrphanedIngressCMSServices(ctx context.Context, 
 
 	// Check each ingress CMS service
 	for _, service := range serviceList.Items {
-		if isIngressCMSService(service.Name, cubridDB) {
+		if isIngressCMSService(service.Name) {
 			// Extract pod name from service name
 			// Service name format: {pod-name}-{namespace}-cms-svc
 			// Example: my-cubrid-0-default-cms-svc

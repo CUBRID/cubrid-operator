@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
@@ -28,14 +27,12 @@ import (
 	"github.com/cubrid/cubrid-operator/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // CubridDBReconciler reconciles a CubridDB object
@@ -99,9 +96,9 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if cubridDB.IsHAEnabled() {
-		haManager := manager.NewHAManager(r.Client, r.Scheme, r.Config)
+		groupHaManager := manager.NewGroupHAManager(r.Client, r.Scheme, r.Config)
 
-		result, err := haManager.ReconcileHAMode(ctx, &cubridDB, req)
+		result, err := groupHaManager.ReconcileGroupHAMode(ctx, &cubridDB, req)
 		if err != nil {
 			return result, err
 		}
@@ -138,17 +135,6 @@ func (r *CubridDBReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *CubridDBReconciler) SetupObjectWatcher(mgr ctrl.Manager) error {
-	podInformer, err := mgr.GetCache().GetInformer(context.Background(), &corev1.Pod{})
-	if err != nil {
-		return err
-	}
-
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    r.podAdded,
-		UpdateFunc: r.podUpdated,
-		DeleteFunc: r.podDeleted,
-	})
-
 	// StatefulSet Informer: Watches for StatefulSet events
 	statefulSetInformer, err := mgr.GetCache().GetInformer(context.Background(), &appsv1.StatefulSet{})
 	if err != nil {
@@ -171,162 +157,6 @@ func (r *CubridDBReconciler) SetupObjectWatcher(mgr ctrl.Manager) error {
 	})
 
 	return nil
-}
-
-// Event handler function to handle Pod add event
-func (r *CubridDBReconciler) podAdded(obj interface{}) {
-	addPod, isPod := obj.(*corev1.Pod)
-	if !isPod {
-		cubriddblog.V(1).Info("podAdded: Received object is not a Pod, skipping.", "objectType", fmt.Sprintf("%T", obj))
-		return
-	}
-
-	cubriddb, err := util.GetCubridDBFromPod(r.Client, addPod)
-	if err != nil {
-		cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to get CubridDB for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
-		return
-	}
-
-	if cubriddb.IsHAEnabled() {
-		// Check if nginx ingress controller exists
-		exists, err := util.IsNginxIngressControllerExists(context.Background(), r.Client)
-		if err != nil {
-			cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to check nginx ingress controller for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
-			return
-		}
-
-		// Update Ingress rules only if nginx ingress controller exists
-		if exists {
-			ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
-			if err := ingressManager.UpdateIngressRules(context.Background(), cubriddb); err != nil {
-				cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to update Ingress rules for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
-				return
-			}
-		}
-
-		if err := util.UpdateCubridDB(context.Background(), r.Client, addPod); err != nil {
-			cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to update CubridDB for Pod %s/%s", addPod.Namespace, addPod.Name), "error", err.Error())
-			return
-		}
-	}
-}
-
-func (r *CubridDBReconciler) podUpdated(oldObj, newObj interface{}) {
-	oldPod := oldObj.(*corev1.Pod)
-	newPod := newObj.(*corev1.Pod)
-
-	if oldPod.Status.Phase != corev1.PodRunning && newPod.Status.Phase == corev1.PodRunning {
-		cubriddb, err := util.GetCubridDBFromPod(r.Client, newPod)
-		if err != nil {
-			cubriddblog.V(1).Info(fmt.Sprintf("Failed to get CubridDB for updated Pod %s/%s", newPod.Namespace, newPod.Name), "error", err.Error())
-			return
-		}
-
-		if cubriddb.IsHAEnabled() {
-			groupName, exists := newPod.Labels["group"]
-			if !exists {
-				cubriddblog.V(1).Info("Pod does not have a 'group' label", "podName", newPod.Name)
-				return
-			}
-
-			podsInGroup, err := r.getPodsInGroup(context.Background(), newPod.Namespace, groupName)
-			if err != nil {
-				cubriddblog.V(1).Info(fmt.Sprintf("Failed to list pods in group %s, %s/%s", groupName, newPod.Namespace, newPod.Name), "error", err.Error())
-				return
-			}
-
-			masterPods := []string{}
-			replicaPods := []string{}
-
-			for _, pod := range podsInGroup {
-				if pod.Labels["grouptype"] == DEF.HA_MASTER_SLAVE_TYPE {
-					masterPods = append(masterPods, pod.Name)
-				} else if pod.Labels["grouptype"] == DEF.HA_REPLICA_TYPE {
-					replicaPods = append(replicaPods, pod.Name)
-				}
-
-				cubriddblog.V(1).Info("master", "pods", strings.Join(masterPods, ":"))
-				cubriddblog.V(1).Info("replica", "pods", strings.Join(replicaPods, ":"))
-			}
-		}
-	}
-}
-
-func (r *CubridDBReconciler) podDeleted(obj interface{}) {
-	var err error
-
-	deletedPod := obj.(*corev1.Pod)
-
-	cubriddb, err := util.GetCubridDBFromPod(r.Client, deletedPod)
-	if err != nil {
-		cubriddblog.V(1).Info(fmt.Sprintf("Failed to get CubridDB for deleted pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-		return
-	}
-
-	if cubriddb.IsHAEnabled() {
-		exists, err := util.IsNginxIngressControllerExists(context.Background(), r.Client)
-		if err != nil {
-			cubriddblog.V(1).Info(fmt.Sprintf("podAdded: Failed to check nginx ingress controller for Pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-			return
-		}
-
-		// Update Ingress rules only if nginx ingress controller exists
-		if exists {
-			// Delete CMS Service for the pod
-			serviceManager := manager.NewServiceManager(r.Client, r.Scheme)
-			if err := serviceManager.DeleteSingleIngressCMSService(context.Background(), cubriddb, deletedPod); err != nil {
-				cubriddblog.V(1).Info(fmt.Sprintf("podDeleted: Failed to delete CMS service for Pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-				return
-			}
-
-			// Update Ingress rules
-			ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
-			if err := ingressManager.UpdateIngressRules(context.Background(), cubriddb); err != nil {
-				cubriddblog.V(1).Info(fmt.Sprintf("podDeleted: Failed to update Ingress rules for Pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-				return
-			}
-		}
-
-		err = util.UpdateCubridDB(context.Background(), r.Client, deletedPod)
-		if err != nil {
-			cubriddblog.V(1).Info(fmt.Sprintf("Failed to update CubridDB for deleted pod %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-			return
-		}
-
-		groupName, exists := deletedPod.Labels["group"]
-		if !exists {
-			cubriddblog.V(1).Info(fmt.Sprintf("Pod does not have a 'group' label %s/%s", deletedPod.Namespace, deletedPod.Name))
-			return
-		}
-
-		podsInGroup, err := r.getPodsInGroup(context.Background(), deletedPod.Namespace, groupName)
-		if err != nil {
-			cubriddblog.V(1).Info(fmt.Sprintf("Failed to list pods in group %s, %s/%s", groupName, deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-			return
-		}
-
-		cubriddbList, err := r.getCubridDBListFromPods(context.Background(), podsInGroup)
-		if err != nil {
-			cubriddblog.V(1).Info(fmt.Sprintf("Failed to list CubridDBs in pods %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-			return
-		}
-
-		for _, cubridDB := range cubriddbList {
-			haManager := manager.NewHAManager(r.Client, r.Scheme, r.Config)
-
-			req := reconcile.Request{
-				NamespacedName: client.ObjectKey{
-					Namespace: deletedPod.Namespace,
-					Name:      deletedPod.Name,
-				},
-			}
-
-			_, err := haManager.ReconcileHAMode(context.Background(), &cubridDB, req)
-			if err != nil {
-				cubriddblog.V(1).Info(fmt.Sprintf("Failed HAMode reconfiguration : %s/%s", deletedPod.Namespace, deletedPod.Name), "error", err.Error())
-			}
-		}
-	}
 }
 
 func (r *CubridDBReconciler) statefulSetDeleted(obj interface{}) {
@@ -402,78 +232,6 @@ func (r *CubridDBReconciler) cubridDeleted(obj interface{}) {
 			return
 		}
 	}
-}
-
-func (r *CubridDBReconciler) getCubridDBListFromPods(ctx context.Context, pods []corev1.Pod) ([]cubridv1.CubridDB, error) {
-	cubridDBList := make([]cubridv1.CubridDB, 0, len(pods))
-	seen := make(map[string]bool)
-
-	for _, pod := range pods {
-		var statefulSetName string
-		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "StatefulSet" {
-				statefulSetName = ownerRef.Name
-				break
-			}
-		}
-
-		if statefulSetName == "" {
-			cubriddblog.V(1).Info("No StatefulSet owner found for Pod", "PodName", pod.Name)
-			continue
-		}
-
-		var statefulSet appsv1.StatefulSet
-		err := r.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: statefulSetName}, &statefulSet)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get StatefulSet %s in namespace %s: %w", statefulSetName, pod.Namespace, err)
-		}
-
-		var cubridDBName string
-		for _, ownerRef := range statefulSet.OwnerReferences {
-			if ownerRef.Kind == "CubridDB" {
-				cubridDBName = ownerRef.Name
-				break
-			}
-		}
-
-		if cubridDBName == "" {
-			cubriddblog.V(1).Info("No CubridDB owner found for StatefulSet", "StatefulSetName", statefulSetName, "Namespace", pod.Namespace)
-			continue
-		}
-
-		key := fmt.Sprintf("%s/%s", pod.Namespace, cubridDBName)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-
-		var cubridDB cubridv1.CubridDB
-		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: cubridDBName}, &cubridDB); err != nil {
-			return nil, fmt.Errorf("failed to get CubridDB %s in namespace %s: %w", cubridDBName, pod.Namespace, err)
-		}
-
-		cubriddblog.V(1).Info("CubridDB added to list", "CubridDBName", cubridDBName, "Namespace", pod.Namespace)
-		cubridDBList = append(cubridDBList, cubridDB)
-	}
-
-	return cubridDBList, nil
-}
-
-func (r *CubridDBReconciler) getPodsInGroup(ctx context.Context, namespace string, groupName string) ([]corev1.Pod, error) {
-	podList := &corev1.PodList{}
-
-	listOptions := &client.ListOptions{
-		Namespace: namespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"group": groupName,
-		}),
-	}
-
-	if err := r.List(ctx, podList, listOptions); err != nil {
-		return nil, err
-	}
-
-	return podList.Items, nil
 }
 
 func (r *CubridDBReconciler) setSpecDefaults(ctx context.Context, cubriddb *cubridv1.CubridDB) error {

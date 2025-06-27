@@ -356,24 +356,19 @@ func (r *BackupDBReconciler) getPod(ctx context.Context, namespace, backupPodNam
 }
 
 func (r *BackupDBReconciler) checkPodState(pod *corev1.Pod, backupPodName string) error {
-	if pod.Status.Phase != corev1.PodRunning {
-		return fmt.Errorf("%s is not Running state (%s)", backupPodName, string(pod.Status.Phase))
-	}
-
-	isRunning, err := util.AllContainersRunning(pod)
+	_, err := util.IsPodAndContainersRunning(pod)
 	if err != nil {
-		return err
-	}
-	if !isRunning {
-		return fmt.Errorf("not all containers in %s are in Running state", backupPodName)
+		return fmt.Errorf("%s: %v", backupPodName, err)
 	}
 	return nil
 }
 
 func (r *BackupDBReconciler) failStatus(ctx context.Context, backupPodName string, backupDB *cubridv1.BackupDB, msg string, err error) error {
 	statusMsg := fmt.Sprintf("%s: %v", msg, err)
-	r.updateStatus(ctx, backupPodName, backupDB, DEF.BackupDB_FAILED, statusMsg)
-	return err
+	if err := r.updateStatus(ctx, backupPodName, backupDB, DEF.BackupDB_FAILED, statusMsg); err != nil {
+		return fmt.Errorf("failed to update status after sending command: %v", err)
+	}
+	return nil
 }
 
 func (r *BackupDBReconciler) updateBackupSchedule(ctx context.Context, req ctrl.Request, backupDB *cubridv1.BackupDB) error {
