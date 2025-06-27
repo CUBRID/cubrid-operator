@@ -43,6 +43,8 @@ help: ## Display this help.
 
 
 ##@ Helm Chart
+NAMESPACE := cubrid
+
 CRD_DIR := config/charts/cubrid-operator-crds/templates
 COMBINED_CRD_FILE := $(CRD_DIR)/crds.yaml
 
@@ -87,17 +89,17 @@ helm-update-repo: helm-package ## Create or Update Helm Repository Index
 .PHONY: helm-install
 helm-install: ## Install Helm Charts (cubrid-operator, cubrid-operator-crds)
 	@echo "Installing $(word 2,$(CHARTS)) chart..."
-	helm install $(word 2,$(CHARTS)) $(HELM_REPO_DIR)/$(word 2,$(CHARTS))-$(VERSION).tgz
+	helm install $(word 2,$(CHARTS)) $(HELM_REPO_DIR)/$(word 2,$(CHARTS))-$(VERSION).tgz --namespace $(NAMESPACE) --create-namespace	
 	@echo "Installing $(word 1,$(CHARTS)) chart..."
-	helm install $(word 1,$(CHARTS)) $(HELM_REPO_DIR)/$(word 1,$(CHARTS))-$(VERSION).tgz
+	helm install $(word 1,$(CHARTS)) $(HELM_REPO_DIR)/$(word 1,$(CHARTS))-$(VERSION).tgz --namespace $(NAMESPACE) --create-namespace
 	@echo "Helm charts installed successfully."
 
 .PHONY: helm-uninstall
 helm-uninstall: ## Uninstall Helm Charts (cubrid-operator, cubrid-operator-crds)
 	@echo "Uninstalling $(word 1,$(CHARTS)) chart..."
-	helm uninstall $(word 1,$(CHARTS))
+	helm uninstall $(word 1,$(CHARTS)) --namespace $(NAMESPACE)
 	@echo "Uninstalling $(word 2,$(CHARTS)) chart..."
-	helm uninstall $(word 2,$(CHARTS))
+	helm uninstall $(word 2,$(CHARTS)) --namespace $(NAMESPACE)
 	@echo "Helm charts uninstalled successfully."
 
 .PHONY: helm-template
