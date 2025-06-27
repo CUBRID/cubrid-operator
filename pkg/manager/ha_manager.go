@@ -5,17 +5,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	cubridv1 "github.com/cubrid/cubrid-operator/api/v1"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	"github.com/cubrid/cubrid-operator/pkg/util"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -23,279 +22,202 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type HAManager struct {
+// GroupHAConfig represents the unified HA configuration for a group
+type GroupHAConfig struct {
+	// Common HA configuration for all pods in the group
+	HaNodeList     string
+	HaCopySyncMode string
+	HaReplicaList  string
+
+	// Pod-specific configurations
+	PodConfigs map[string]PodHAConfig
+}
+
+// PodHAConfig represents HA configuration specific to a pod
+type PodHAConfig struct {
+	HAMode string // "on" for master-slave, "replica" for replica
+}
+
+// GroupHAManager handles HA configuration for groups of pods
+type GroupHAManager struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Config *rest.Config
 }
 
-var halog = log.Log.WithName("HAMode")
+var groupHalog = log.Log.WithName("GroupHAMode")
 
-func NewHAManager(client client.Client, scheme *runtime.Scheme, config *rest.Config) *HAManager {
-	return &HAManager{
+func NewGroupHAManager(client client.Client, scheme *runtime.Scheme, config *rest.Config) *GroupHAManager {
+	return &GroupHAManager{
 		Client: client,
 		Scheme: scheme,
 		Config: config,
 	}
 }
 
-func (r *HAManager) ReconcileHAMode(
+// ReconcileGroupHAMode is the main entry point for group-based HA configuration
+func (g *GroupHAManager) ReconcileGroupHAMode(
 	ctx context.Context,
 	cubridDB *cubridv1.CubridDB,
 	req ctrl.Request,
 ) (ctrl.Result, error) {
-	var result ctrl.Result
-	var err error
-	var msCubridDBName, replicaCubridDBName string
-
-	switch cubridDB.HAmodeType() {
-	case DEF.HA_MASTER_SLAVE_TYPE:
-		msCubridDBName = cubridDB.Name
-
-		// Ensure that CubridRef is initialized
-		replicaRef := util.InitCubridRef(cubridDB)
-		replicaCubridDBName = replicaRef.ReplicaLink
-
-		halog.Info("Master-Slave info", "Master-Slave", msCubridDBName, "Replica", replicaCubridDBName)
-
-		// Update the Master-Slave configuration
-		if result, err = r.SetMasterSlaveConfig(
-			ctx,
-			msCubridDBName,
-			replicaCubridDBName,
-			cubridDB.Namespace,
-			req,
-		); err != nil {
-			return result, err
-		}
-
-	case DEF.HA_REPLICA_TYPE:
-		halog.Info("Replica info", "Replica Name", cubridDB.Name)
-
-		replicaCubridDBName = cubridDB.Name
-		cubridRef := cubridDB.Spec.Replication.HAmodeType.CubridRef
-
-		if cubridRef == nil || cubridRef.Name == "" {
-			return ctrl.Result{}, nil
-		}
-
-		if result, err = r.SetReplicaConfig(ctx, cubridRef.Name, replicaCubridDBName, cubridDB.Namespace, req); err != nil {
-			return result, err
-		}
-
-	default:
-		return ctrl.Result{}, fmt.Errorf("it is an unknown HA Mode type. : %s", cubridDB.HAmodeType())
+	if !cubridDB.IsHAEnabled() {
+		return ctrl.Result{}, nil
 	}
 
-	return result, nil
-}
+	groupHalog.Info("Starting group HA reconciliation", "cubridDB", cubridDB.Name, "haMode", cubridDB.HAmodeType())
 
-func (r *HAManager) SetMasterSlaveConfig(
-	ctx context.Context,
-	msCubridDBName,
-	rCubridDBName,
-	namespace string,
-	req ctrl.Request,
-) (ctrl.Result, error) {
-	if err := r.settingHAMasterSlave(ctx, msCubridDBName, namespace, req); err != nil {
-		return ctrl.Result{}, err
+	// Get group name based on HA mode type
+	groupName := g.getGroupName(cubridDB)
+
+	// Get all pods in the group
+	allPodsInGroup, err := g.getAllPodsInGroup(ctx, cubridDB.Namespace, groupName)
+	for _, pod := range allPodsInGroup {
+		groupHalog.Info("Pod in group", "podName", pod.Name, "namespace", pod.Namespace, "labels", pod.Labels)
 	}
 
-	if rCubridDBName != "" {
-		if err := r.updateHAReplicaList(ctx, msCubridDBName, rCubridDBName, namespace, req); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get pods in group %s: %v", groupName, err)
 	}
 
+	if len(allPodsInGroup) == 0 {
+		groupHalog.V(1).Info("No pods found in group", "group", groupName)
+		return ctrl.Result{}, nil
+	}
+
+	// Build unified HA configuration for the entire group
+	haConfig := g.buildGroupHAConfig(ctx, allPodsInGroup)
+
+	// Apply HA configuration to all pods in the group
+	g.applyGroupHAConfig(allPodsInGroup, haConfig)
+
+	groupHalog.Info("Group HA reconciliation completed", "group", groupName, "pods", len(allPodsInGroup))
 	return ctrl.Result{}, nil
 }
 
-func (r *HAManager) SetReplicaConfig(
-	ctx context.Context,
-	masterName,
-	replicaName,
-	namespace string,
-	req ctrl.Request,
-) (ctrl.Result, error) {
-	if err := r.settingHAReplica(ctx, replicaName, namespace, req); err != nil {
-		return ctrl.Result{}, err
-	}
+// getGroupName returns the group name based on HA mode type
+func (g *GroupHAManager) getGroupName(cubridDB *cubridv1.CubridDB) string {
+	var groupName string
 
-	if err := r.updateHAReplicaList(ctx, masterName, replicaName, namespace, req); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.updateHANodeListAndSyncMode(ctx, masterName, replicaName, namespace, req); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *HAManager) settingHAMasterSlave(
-	ctx context.Context,
-	cubridDBName string,
-	namespace string,
-	req ctrl.Request,
-) error {
-	msPodLists, msServiceName, err := r.getCubridDBPodList(ctx, cubridDBName, namespace)
-	if err != nil {
-		return err
-	}
-
-	if len(msPodLists.Items) > 0 {
-		nodeDNSList := CreateDNSList(msPodLists.Items, msServiceName, req.Namespace)
-		haNodeList := fmt.Sprintf("cubrid@%s", strings.Join(nodeDNSList, ":"))
-		haCopySyncMode := strings.TrimSuffix(strings.Repeat("sync:", len(nodeDNSList)), ":")
-
-		commands := buildHAmodeCmds(haNodeList, haCopySyncMode)
-
-		for _, command := range commands {
-			if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
-				return err
-			}
+	if cubridDB.HAmodeType() == DEF.HA_REPLICA_TYPE {
+		// For replica type, use the master's name as group name
+		if cubridDB.Spec.Replication.HAmodeType.CubridRef != nil {
+			groupName = cubridDB.Spec.Replication.HAmodeType.CubridRef.Name + DEF.SELECTOR_SUFFIX
 		}
 	} else {
-		halog.V(1).Info("Could not find a host to configure HA.")
+		groupName = cubridDB.Name + DEF.SELECTOR_SUFFIX
 	}
 
-	return nil
+	groupHalog.Info(
+		"Generated group name",
+		"cubridDB", cubridDB.Name,
+		"haMode", cubridDB.HAmodeType(),
+		"groupName", groupName,
+	)
+	return groupName
 }
 
-func (r *HAManager) updateHANodeListAndSyncMode(
-	ctx context.Context,
-	msName string,
-	rName string,
-	namespace string,
-	req ctrl.Request,
-) error {
-	var msNodeList string = ""
-	var msCopySyncMode string = ""
+// getAllPodsInGroup gets all pods that belong to the same HA group
+func (g *GroupHAManager) getAllPodsInGroup(ctx context.Context, namespace, groupName string) ([]corev1.Pod, error) {
+	podList := &corev1.PodList{}
 
-	if msName != "" {
-		msPodLists, msServiceName, err := r.getCubridDBPodList(ctx, msName, namespace)
-		if err != nil {
-			return err
-		}
-
-		if len(msPodLists.Items) > 0 {
-			msDNSList := CreateDNSList(msPodLists.Items, msServiceName, req.Namespace)
-			msNodeList = fmt.Sprintf("cubrid@%s", strings.Join(msDNSList, ":"))
-			msCopySyncMode = strings.TrimSuffix(strings.Repeat("sync:", len(msDNSList)), ":")
-
-			commands := buildNodeListCmds(msNodeList, msCopySyncMode)
-
-			for _, command := range commands {
-				if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
-					return err
-				}
-			}
-		} else {
-			halog.V(1).Info("No pods found")
-		}
+	listOptions := &client.ListOptions{
+		Namespace: namespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"group": groupName,
+		}),
 	}
 
-	if rName != "" {
-		rList, _, err := r.getCubridDBPodList(ctx, rName, namespace)
-		if err != nil {
-			return err
-		}
+	groupHalog.Info("Searching for pods in group", "namespace", namespace, "groupName", groupName)
 
-		commands := buildNodeListCmds(msNodeList, msCopySyncMode)
-
-		for _, command := range commands {
-			if err := r.execCommandsInPods(ctx, rList.Items, r.Config, namespace, command); err != nil {
-				return err
-			}
-		}
+	if err := g.List(ctx, podList, listOptions); err != nil {
+		return nil, err
 	}
-	return nil
+
+	groupHalog.Info("Found pods in group", "groupName", groupName, "podCount", len(podList.Items))
+	for _, pod := range podList.Items {
+		groupHalog.Info("Pod in group", "podName", pod.Name, "namespace", pod.Namespace, "labels", pod.Labels)
+	}
+
+	return podList.Items, nil
 }
 
-func (r *HAManager) updateHAReplicaList(
-	ctx context.Context,
-	msCubridDBName string,
-	replicaCubridDBName string,
-	namespace string,
-	req ctrl.Request,
-) error {
-	var commands map[string][]string
-	var repDNSListStr []string
-	var repNodeListStr string = ""
-	var rList *corev1.PodList = &corev1.PodList{}
+// buildGroupHAConfig builds unified HA configuration for the entire group
+func (g *GroupHAManager) buildGroupHAConfig(ctx context.Context, allPods []corev1.Pod) *GroupHAConfig {
+	config := &GroupHAConfig{
+		PodConfigs: make(map[string]PodHAConfig),
+	}
 
-	if replicaCubridDBName != "" {
-		var rServiceName string
+	// Separate pods by type
+	masterSlavePods := []corev1.Pod{}
+	replicaPods := []corev1.Pod{}
 
-		rList, rServiceName, _ = r.getCubridDBPodList(ctx, replicaCubridDBName, namespace)
+	groupHalog.Info("Processing pods for HA config", "totalPods", len(allPods))
 
-		if rList != nil && len(rList.Items) > 0 {
-			repDNSListStr = CreateDNSList(rList.Items, rServiceName, req.Namespace)
-			repNodeListStr = fmt.Sprintf("cubrid@%s", strings.Join(repDNSListStr, ":"))
-			commands = buildReplicaListCmds(repNodeListStr)
+	for _, pod := range allPods {
+		groupType, exists := pod.Labels["grouptype"]
+		if !exists {
+			groupHalog.V(1).Info("Pod missing grouptype label", "pod", pod.Name)
+			continue
+		}
 
-			for _, command := range commands {
-				if err := r.execCommandsInPods(ctx, rList.Items, r.Config, namespace, command); err != nil {
-					return err
-				}
-			}
+		groupHalog.Info(
+			"Pod grouptype",
+			"pod", pod.Name,
+			"grouptype", groupType,
+			"expectedMasterSlave", DEF.HA_MASTER_SLAVE_TYPE,
+			"expectedReplica", DEF.HA_REPLICA_TYPE,
+		)
+
+		if groupType == DEF.HA_MASTER_SLAVE_TYPE {
+			groupHalog.Info("Adding pod to master-slave list", "pod", pod.Name)
+			masterSlavePods = append(masterSlavePods, pod)
+			config.PodConfigs[pod.Name] = PodHAConfig{HAMode: "on"}
+		} else if groupType == DEF.HA_REPLICA_TYPE {
+			groupHalog.Info("Adding pod to replica list", "pod", pod.Name)
+			replicaPods = append(replicaPods, pod)
+			config.PodConfigs[pod.Name] = PodHAConfig{HAMode: "replica"}
 		} else {
-			halog.Info("No pods found", "repNodeListStr", repNodeListStr)
+			groupHalog.V(1).Info("Pod has unknown grouptype", "pod", pod.Name, "grouptype", groupType)
 		}
 	}
 
-	if msCubridDBName != "" {
-		var commands = make(map[string][]string)
-		msPodLists, _, err := r.getCubridDBPodList(ctx, msCubridDBName, namespace)
-		if err != nil {
-			return err
-		}
-
-		if rList != nil && len(rList.Items) > 0 {
-			commands = buildReplicaListCmds(repNodeListStr)
-		} else {
-			commands = buildReplicaDelCmds()
-		}
-
-		for _, command := range commands {
-			if err := r.execCommandsInPods(ctx, msPodLists.Items, r.Config, namespace, command); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (r *HAManager) settingHAReplica(
-	ctx context.Context,
-	statefulSetName string,
-	namespace string,
-	req ctrl.Request,
-) error {
-	podList, serviceName, err := r.getCubridDBPodList(ctx, statefulSetName, namespace)
-	if err != nil {
-		return err
-	}
-
-	if len(podList.Items) > 0 {
-		nodeDNSList := CreateDNSList(podList.Items, serviceName, req.Namespace)
-		haNodeList := fmt.Sprintf("cubrid@%s", strings.Join(nodeDNSList, ":"))
-
-		commands := buildReplicaCmds(haNodeList)
-
-		for _, command := range commands {
-			if err := r.execCommandsInPods(ctx, podList.Items, r.Config, namespace, command); err != nil {
-				return err
-			}
-		}
+	// Build ha_node_list from master-slave pods
+	if len(masterSlavePods) > 0 {
+		groupHalog.Info("Building ha_node_list from master-slave pods", "count", len(masterSlavePods))
+		msDNSList := g.createDNSList(ctx, masterSlavePods)
+		config.HaNodeList = fmt.Sprintf("cubrid@%s", strings.Join(msDNSList, ":"))
+		config.HaCopySyncMode = strings.TrimSuffix(strings.Repeat("sync:", len(msDNSList)), ":")
+		groupHalog.Info(
+			"Built ha_node_list",
+			"haNodeList", config.HaNodeList,
+			"haCopySyncMode", config.HaCopySyncMode,
+		)
 	} else {
-		halog.V(1).Info("Could not find a host to configure the replica.")
+		groupHalog.Info("No master-slave pods found for ha_node_list")
 	}
 
-	return nil
+	// Build ha_replica_list from replica pods
+	if len(replicaPods) > 0 {
+		groupHalog.Info("Building ha_replica_list from replica pods", "count", len(replicaPods))
+		replicaDNSList := g.createDNSList(ctx, replicaPods)
+		config.HaReplicaList = fmt.Sprintf("cubrid@%s", strings.Join(replicaDNSList, ":"))
+		groupHalog.Info("Built ha_replica_list", "haReplicaList", config.HaReplicaList)
+	} else {
+		groupHalog.Info("No replica pods found for ha_replica_list")
+	}
+
+	groupHalog.V(1).Info("Built group HA config",
+		"masterSlavePods", len(masterSlavePods),
+		"replicaPods", len(replicaPods),
+		"haNodeList", config.HaNodeList,
+		"haReplicaList", config.HaReplicaList)
+
+	return config
 }
 
-func CreateDNSList(pods []corev1.Pod, serviceName, namespace string) []string {
+// createDNSList creates DNS names for pods
+func (g *GroupHAManager) createDNSList(ctx context.Context, pods []corev1.Pod) []string {
 	dnsList := make([]string, 0, len(pods))
 
 	for _, pod := range pods {
@@ -303,15 +225,173 @@ func CreateDNSList(pods []corev1.Pod, serviceName, namespace string) []string {
 		if hostname == "" {
 			hostname = pod.Name
 		}
+
+		// Extract StatefulSet name from pod name
+		// Pod names are like: ha-ms-0, ha-ms-1, ha-rep-0
+		// StatefulSet names are like: ha-ms, ha-rep
+		statefulSetName := g.extractStatefulSetNameFromPod(pod.Name)
+		if statefulSetName == "" {
+			groupHalog.V(1).Info("Failed to extract StatefulSet name from pod", "pod", pod.Name)
+			continue
+		}
+
+		groupHalog.Info("Extracted StatefulSet name", "pod", pod.Name, "statefulSet", statefulSetName)
+
+		// Get StatefulSet to get service name
+		statefulSet, err := util.FetchStatefulSet(ctx, g.Client, statefulSetName, pod.Namespace)
+		if err != nil {
+			groupHalog.Error(err, "Failed to get StatefulSet", "pod", pod.Name, "statefulSet", statefulSetName)
+			continue
+		}
+		serviceName := statefulSet.Spec.ServiceName
 		dnsName := util.CreateDNSShortName(hostname, serviceName)
 		dnsList = append(dnsList, dnsName)
 	}
+
 	return dnsList
 }
 
-func buildHAmodeCmds(haNodeList, haCopySyncMode string) map[string][]string {
-	cubridPath := getCubridPath()
+// extractStatefulSetNameFromPod extracts StatefulSet name from pod name
+// Pod names: ha-ms-0, ha-ms-1, ha-rep-0 -> StatefulSet names: ha-ms, ha-rep
+func (g *GroupHAManager) extractStatefulSetNameFromPod(podName string) string {
+	// Use regex to match the pattern: name-number
+	// This will match the last occurrence of -number at the end
+	re := regexp.MustCompile(`^(.*)-\d+$`)
+	matches := re.FindStringSubmatch(podName)
+	if len(matches) >= 2 {
+		return matches[1]
+	}
 
+	// Fallback: if no pattern matches, return empty string
+	return ""
+}
+
+// applyGroupHAConfig applies HA configuration to all pods in the group
+func (g *GroupHAManager) applyGroupHAConfig(allPods []corev1.Pod, config *GroupHAConfig) {
+	for _, pod := range allPods {
+		podConfig, exists := config.PodConfigs[pod.Name]
+		if !exists {
+			groupHalog.V(1).Info("No config found for pod", "pod", pod.Name)
+			continue
+		}
+
+		// Apply cubrid_ha.conf (same for all pods in group)
+		if err := g.applyCubridHAConf(pod, config); err != nil {
+			groupHalog.Error(err, "Failed to apply cubrid_ha.conf", "pod", pod.Name)
+			continue
+		}
+
+		// Apply cubrid.conf (pod-specific)
+		if err := g.applyCubridConf(pod, podConfig, config); err != nil {
+			groupHalog.Error(err, "Failed to apply cubrid.conf", "pod", pod.Name)
+			continue
+		}
+	}
+}
+
+// applyCubridHAConf applies cubrid_ha.conf configuration to a pod
+func (g *GroupHAManager) applyCubridHAConf(pod corev1.Pod, config *GroupHAConfig) error {
+	commands := g.buildCubridHAConfCommands(config)
+
+	groupHalog.Info("Applying cubrid_ha.conf to pod", "pod", pod.Name, "commandCount", len(commands))
+
+	for commandName, command := range commands {
+		groupHalog.Info("Executing command", "pod", pod.Name, "command", commandName, "args", command)
+		if err := g.execCommandInPod(pod, command); err != nil {
+			return fmt.Errorf("failed to execute command %v in pod %s: %v", command, pod.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// applyCubridConf applies cubrid.conf configuration to a pod
+func (g *GroupHAManager) applyCubridConf(pod corev1.Pod, podConfig PodHAConfig, groupConfig *GroupHAConfig) error {
+	commands := g.buildCubridConfCommands(podConfig, groupConfig)
+
+	groupHalog.Info("Applying cubrid.conf to pod", "pod", pod.Name, "commandCount", len(commands))
+
+	for commandName, command := range commands {
+		groupHalog.Info("Executing command", "pod", pod.Name, "command", commandName, "args", command)
+		if err := g.execCommandInPod(pod, command); err != nil {
+			return fmt.Errorf("failed to execute command %v in pod %s: %v", command, pod.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// buildCubridHAConfCommands builds commands for cubrid_ha.conf configuration
+func (g *GroupHAManager) buildCubridHAConfCommands(config *GroupHAConfig) map[string][]string {
+	cubridPath := g.getCubridPath()
+	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
+
+	groupHalog.Info("Building cubrid_ha.conf commands",
+		"haNodeList", config.HaNodeList,
+		"haCopySyncMode", config.HaCopySyncMode,
+		"haReplicaList", config.HaReplicaList)
+
+	commands := map[string][]string{
+		"ha_common_config":    {"sh", "-c", fullpath + "ha_common_config"},
+		"ha_log_max_archives": {"sh", "-c", fullpath + "ha_log_max_archives"},
+	}
+
+	// Add ha_node_list if master-slave pods exist
+	if config.HaNodeList != "" {
+		groupHalog.Info("Adding ha_node_list command", "haNodeList", config.HaNodeList)
+		commands["ha_node_list"] = []string{"sh", "-c", fullpath + "ha_node_list" + " " + config.HaNodeList}
+		commands["ha_copy_sync_mode"] = []string{"sh", "-c", fullpath + "ha_copy_sync_mode" + " " + config.HaCopySyncMode}
+	} else {
+		groupHalog.Info("ha_node_list is empty, skipping")
+	}
+
+	// Add ha_replica_list if replica pods exist
+	if config.HaReplicaList != "" {
+		groupHalog.Info("Adding ha_replica_list command", "haReplicaList", config.HaReplicaList)
+		commands["ha_replica_list"] = []string{"sh", "-c", fullpath + "ha_replica_list" + " " + config.HaReplicaList}
+	} else {
+		groupHalog.Info("ha_replica_list is empty, skipping")
+	}
+
+	groupHalog.Info("Final commands for cubrid_ha.conf", "commands", commands)
+	return commands
+}
+
+// buildCubridConfCommands builds commands for cubrid.conf configuration
+func (g *GroupHAManager) buildCubridConfCommands(
+	podConfig PodHAConfig,
+	groupConfig *GroupHAConfig,
+) map[string][]string {
+	// Use local implementations copied from ha_manager.go with correct values
+	if podConfig.HAMode == "on" {
+		// For master-slave mode, use buildHAmodeCmds with correct node list
+		groupHalog.Info(
+			"Building master-slave commands for cubrid.conf",
+			"haNodeList", groupConfig.HaNodeList,
+			"haCopySyncMode", groupConfig.HaCopySyncMode,
+		)
+		return g.buildHAmodeCmds(groupConfig.HaNodeList, groupConfig.HaCopySyncMode)
+	} else if podConfig.HAMode == "replica" {
+		// For replica mode, use buildReplicaCmds with correct replica list
+		groupHalog.Info(
+			"Building replica commands for cubrid.conf",
+			"haReplicaList", groupConfig.HaReplicaList,
+		)
+		return g.buildReplicaCmds(groupConfig.HaReplicaList)
+	}
+
+	// Default case: only common config
+	cubridPath := g.getCubridPath()
+	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
+
+	return map[string][]string{
+		"ha_log_max_archives": {"sh", "-c", fullpath + "ha_log_max_archives"},
+	}
+}
+
+// buildHAmodeCmds builds commands for master-slave HA mode (copied from ha_manager.go)
+func (g *GroupHAManager) buildHAmodeCmds(haNodeList, haCopySyncMode string) map[string][]string {
+	cubridPath := g.getCubridPath()
 	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
 
 	commands := map[string][]string{
@@ -326,9 +406,9 @@ func buildHAmodeCmds(haNodeList, haCopySyncMode string) map[string][]string {
 	return commands
 }
 
-func buildReplicaCmds(haReplicaList string) map[string][]string {
-	cubridPath := getCubridPath()
-
+// buildReplicaCmds builds commands for replica HA mode (copied from ha_manager.go)
+func (g *GroupHAManager) buildReplicaCmds(haReplicaList string) map[string][]string {
+	cubridPath := g.getCubridPath()
 	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
 
 	commands := map[string][]string{
@@ -341,81 +421,32 @@ func buildReplicaCmds(haReplicaList string) map[string][]string {
 	return commands
 }
 
-func buildNodeListCmds(haNodeList string, haCopySyncMode string) map[string][]string {
-	cubridPath := getCubridPath()
-
-	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
-
-	commands := map[string][]string{
-		"ha_node_list":      {"sh", "-c", fullpath + "ha_node_list" + " " + haNodeList},
-		"ha_copy_sync_mode": {"sh", "-c", fullpath + "ha_copy_sync_mode" + " " + haCopySyncMode},
+// execCommandInPod executes a command in a specific pod
+func (g *GroupHAManager) execCommandInPod(pod corev1.Pod, command []string) error {
+	// Check if pod is running
+	if !g.isPodRunning(&pod) {
+		groupHalog.V(1).Info("Pod is not running, skipping command execution", "pod", pod.Name)
+		return nil
 	}
 
-	return commands
-}
-
-func buildReplicaListCmds(haReplicaList string) map[string][]string {
-	cubridPath := getCubridPath()
-
-	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
-
-	commands := map[string][]string{
-		"ha_replica_list": {"sh", "-c", fullpath + "ha_replica_list" + " " + haReplicaList},
-	}
-
-	return commands
-}
-
-func buildReplicaDelCmds() map[string][]string {
-	cubridPath := getCubridPath()
-
-	fullpath := cubridPath + "/" + DEF.HATemplateFilePath + " "
-	commands := map[string][]string{
-		"ha_del_replica_list": {"sh", "-c", fullpath + "ha_del_replica_list"},
-	}
-
-	return commands
-}
-
-func (r *HAManager) execCommandsInPods(
-	ctx context.Context,
-	pods []corev1.Pod,
-	config *rest.Config,
-	namespace string,
-	command []string,
-) error {
-	for _, pod := range pods {
-		isRunning, err := r.checkIfPodIsRunning(ctx, pod.Name, namespace)
-		if err != nil {
-			return err
-		}
-
-		if !isRunning {
-			halog.V(1).Info("Pod is not in Running state", "Pod.Name", pod.Name)
-			continue
-		}
-
-		isContainersRunning, err := allContainersRunning(&pod)
-		if err != nil {
-			halog.V(1).Info("container is not in Running state", "Pod.Name", pod.Name)
-			continue
-		}
-
-		if !isContainersRunning {
-			halog.V(1).Info("Not all containers are in Running state, requeueing", "Pod.Name", pod.Name)
-			continue
-		}
-
-		for _, container := range pod.Spec.Containers {
-			if err := execCommand(config, namespace, pod.Name, container.Name, command); err != nil {
-				return err
-			}
+	// Execute command in all containers of the pod
+	for _, container := range pod.Spec.Containers {
+		if err := g.execCommand(g.Config, pod.Namespace, pod.Name, container.Name, command); err != nil {
+			return fmt.Errorf("failed to execute command %v in pod %s container %s: %v", command, pod.Name, container.Name, err)
 		}
 	}
+
 	return nil
 }
 
-func execCommand(config *rest.Config, namespace, podName string, containerNames string, command []string) error {
+// execCommand executes a command in a specific container (copied from ha_manager.go)
+func (g *GroupHAManager) execCommand(
+	config *rest.Config,
+	namespace,
+	podName string,
+	containerNames string,
+	command []string,
+) error {
 	var stdout, stderr bytes.Buffer
 
 	podExecOptions := &corev1.PodExecOptions{
@@ -435,7 +466,7 @@ func execCommand(config *rest.Config, namespace, podName string, containerNames 
 		Name(podName).
 		Namespace(namespace).
 		SubResource("exec").
-		VersionedParams(podExecOptions, scheme.ParameterCodec)
+		VersionedParams(podExecOptions, runtime.NewParameterCodec(g.Scheme))
 
 	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
@@ -454,68 +485,17 @@ func execCommand(config *rest.Config, namespace, podName string, containerNames 
 	return nil
 }
 
-func (r *HAManager) checkIfPodIsRunning(ctx context.Context, podName string, namespace string) (bool, error) {
-	var pod corev1.Pod
-	err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: namespace}, &pod)
-	if err != nil {
-		return false, fmt.Errorf("failed to get Pod %s/%s: %v", namespace, podName, err)
-	}
-
-	return pod.Status.Phase == corev1.PodRunning, nil
+// isPodRunning checks if a pod is in running state
+func (g *GroupHAManager) isPodRunning(pod *corev1.Pod) bool {
+	_, err := util.IsPodAndContainersRunning(pod)
+	return err == nil
 }
 
-func allContainersRunning(pod *corev1.Pod) (bool, error) {
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.State.Running == nil {
-			if containerStatus.State.Waiting != nil {
-				return false, fmt.Errorf(
-					"container %s is waiting: %v",
-					containerStatus.Name,
-					containerStatus.State.Waiting.Reason)
-			} else if containerStatus.State.Terminated != nil {
-				return false, fmt.Errorf(
-					"container %s is terminated: %v",
-					containerStatus.Name,
-					containerStatus.State.Terminated.Reason,
-				)
-			}
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func (r *HAManager) getCubridDBPodList(
-	ctx context.Context,
-	name string,
-	namespace string,
-) (*corev1.PodList, string, error) {
-	var statefulSet appsv1.StatefulSet
-	var serviceName string
-
-	if err := r.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &statefulSet); err != nil {
-		return nil, "", fmt.Errorf("unable to fetch StatefulSet: %w", err)
-	}
-
-	podList := &corev1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(namespace),
-		client.MatchingLabels(statefulSet.Spec.Selector.MatchLabels),
-	}
-	if err := r.List(ctx, podList, listOpts...); err != nil {
-		return nil, "", fmt.Errorf("unable to list pods: %w", err)
-	}
-
-	serviceName = statefulSet.Spec.ServiceName
-
-	return podList, serviceName, nil
-}
-
-func getCubridPath() string {
+// getCubridPath returns the CUBRID installation path
+func (g *GroupHAManager) getCubridPath() string {
 	cubridUserPath := os.Getenv("CUBRID")
 	if cubridUserPath == "" {
 		cubridUserPath = DEF.DefaultCUBRIDPath
 	}
-
 	return cubridUserPath
 }
