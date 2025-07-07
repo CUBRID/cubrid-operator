@@ -14,8 +14,8 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
-  namespace: system
+  name: cubrid-operator-dep
+  namespace: cubrid
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: deployment
@@ -69,8 +69,9 @@ spec:
       - command:
         - /manager
         args:
-        - --leader-elect
+          #- "--leader-elect=true"
         image: airnet73/operator:latest
+        imagePullPolicy: Always
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
@@ -88,7 +89,7 @@ spec:
             path: /readyz
             port: 8081
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 20
         # TODO(user): Configure the resources accordingly based on the project requirements.
         # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
         resources:
@@ -98,5 +99,5 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-      serviceAccountName: controller-manager
+      serviceAccountName: cubrid-operator-sa
       terminationGracePeriodSeconds: 10
