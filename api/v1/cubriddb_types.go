@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -129,12 +131,85 @@ type HAPortConfig struct {
 }
 
 type Storage struct {
-	Name             string             `json:"name,omitempty"`
-	MountPath        string             `json:"mountPath,omitempty"`
-	Type             string             `json:"type,omitempty"`
-	Size             *resource.Quantity `json:"size,omitempty"`
-	StorageClassName string             `json:"storageClassName,omitempty" webhook:"inmutable"`
-	VolumeName       string             `json:"volumeName,omitempty" webhook:"inmutable"`
+	Name                string               `json:"name,omitempty"`
+	MountPath           string               `json:"mountPath,omitempty"`
+	Type                string               `json:"type,omitempty"`
+	Size                *resource.Quantity   `json:"size,omitempty"`
+	StorageClassName    string               `json:"storageClassName,omitempty" webhook:"inmutable"`
+	VolumeName          string               `json:"volumeName,omitempty" webhook:"inmutable"`
+	VolumeClaimTemplate *VolumeClaimTemplate `json:"volumeClaimTemplate,omitempty"`
+}
+
+type VolumeClaimTemplate struct {
+	Metadata *VolumeClaimTemplateMetadata `json:"metadata,omitempty"`
+	// AccessModes defines the access modes for the PVC
+	// +optional
+	// +listType=atomic
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+	// Selector defines the selector for the PVC (required for static provisioning)
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	// Resources defines the resource requirements for the PVC
+	// +optional
+	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
+	// StorageClassName defines the storage class for the PVC
+	// For dynamic provisioning: specify the storage class name
+	// For static provisioning: should be empty string or nil
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+}
+
+type VolumeClaimTemplateMetadata struct {
+	Name        string            `json:"name,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// ValidateStorage validates the storage configuration
+func (s *Storage) ValidateStorage() error {
+	// Check if both dynamic and static provisioning are configured
+	hasDynamicProvisioning := len(s.StorageClassName) > 0
+	hasStaticProvisioning := s.VolumeClaimTemplate != nil && s.isStaticProvisioning()
+
+	if hasDynamicProvisioning && hasStaticProvisioning {
+		return fmt.Errorf("cannot use both dynamic provisioning (storageClassName) and static provisioning (volumeClaimTemplate with empty storageClassName) for storage: %s", s.Name)
+	}
+
+	// Validate static provisioning configuration
+	if hasStaticProvisioning {
+		if s.VolumeClaimTemplate.Selector == nil {
+			return fmt.Errorf("selector is required for static provisioning in storage: %s", s.Name)
+		}
+		if s.VolumeClaimTemplate.StorageClassName != nil && *s.VolumeClaimTemplate.StorageClassName != "" {
+			return fmt.Errorf("storageClassName should be empty or nil for static provisioning in storage: %s", s.Name)
+		}
+	}
+
+	// Validate dynamic provisioning configuration
+	if hasDynamicProvisioning {
+		if s.VolumeClaimTemplate != nil && s.isStaticProvisioning() {
+			return fmt.Errorf("cannot use static provisioning (empty storageClassName) with storageClassName field for storage: %s", s.Name)
+		}
+	}
+
+	return nil
+}
+
+// isStaticProvisioning returns true if the storage uses static provisioning
+func (s *Storage) isStaticProvisioning() bool {
+	return s.VolumeClaimTemplate != nil &&
+		(s.VolumeClaimTemplate.StorageClassName == nil || *s.VolumeClaimTemplate.StorageClassName == "")
+}
+
+// IsStaticProvisioning returns true if the storage uses static provisioning
+func (s *Storage) IsStaticProvisioning() bool {
+	return s.isStaticProvisioning()
+}
+
+// IsDynamicProvisioning returns true if the storage uses dynamic provisioning
+func (s *Storage) IsDynamicProvisioning() bool {
+	return len(s.StorageClassName) > 0 ||
+		(s.VolumeClaimTemplate != nil && !s.isStaticProvisioning())
 }
 
 //+kubebuilder:object:root=true

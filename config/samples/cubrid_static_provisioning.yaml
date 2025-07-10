@@ -1,0 +1,90 @@
+# Static Provisioning Example for CubridDB
+# This example shows how to use static provisioning with pre-created PVs
+# 
+# Before applying this CubridDB, you need to create the required PVs:
+# kubectl apply -f pvs-for-static-provisioning.yaml
+
+apiVersion: k8s.cubrid.com/v1
+kind: CubridDB
+metadata:
+  labels:
+    app.kubernetes.io/name: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: cubrid-static
+spec:
+  image: cubrid/cubrid
+  initContainerImage: busybox
+  imagePullPolicy: Always
+  replication:
+    enable: true
+    replicas: 2
+  broker:
+  - name: s-broker1-svc
+    port: 30000
+    servicePort: 30300
+    serviceType: NodePort
+  - name: s-broker2-svc
+    port: 33000
+    servicePort: 30301
+    serviceType: NodePort
+  storage:
+    - name: database
+      type: database-storage-type
+      mountPath: /home/cubrid/CUBRID/databases
+      volumeClaimTemplate:
+        metadata:
+          name: database
+        resources:
+          requests:
+            storage: 2Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: ""  # Empty string = static provisioning
+        selector:
+          matchLabels:
+            type: cubrid-database
+    - name: logs
+      type: logs-storage-type
+      mountPath: /home/cubrid/CUBRID/log
+      volumeClaimTemplate:
+        metadata:
+          name: logs
+        resources:
+          requests:
+            storage: 1Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: ""  # Empty string = static provisioning
+        selector:
+          matchLabels:
+            type: cubrid-logs
+    - name: conf
+      type: conf-storage-type
+      mountPath: /home/cubrid/CUBRID/conf
+      volumeClaimTemplate:
+        metadata:
+          name: conf
+        resources:
+          requests:
+            storage: 1Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: ""  # Empty string = static provisioning
+        selector:
+          matchLabels:
+            type: cubrid-conf
+    - name: backup
+      type: backup-storage-type
+      mountPath: /home/cubrid/CUBRID/backupdb
+      volumeClaimTemplate:
+        metadata:
+          name: backup
+        resources:
+          requests:
+            storage: 1Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: ""  # Empty string = static provisioning
+        selector:
+          matchLabels:
+            type: cubrid-backup 

@@ -10,21 +10,57 @@ import (
 )
 
 func CreatePersistentVolumeClaimSpec(storage cubridv1.Storage) (corev1.PersistentVolumeClaimSpec, error) {
-	if len(storage.VolumeName) > 0 {
-		return corev1.PersistentVolumeClaimSpec{
-			AccessModes: CreatePersistentVolumeAccessModes(),
-			Resources:   CreateVolumeResourceRequirements(storage.Size),
-			VolumeName:  storage.VolumeName,
-		}, nil
-	} else if len(storage.StorageClassName) > 0 {
+	// 1. If volumeClaimTemplate exists
+	if storage.VolumeClaimTemplate != nil {
+		spec := corev1.PersistentVolumeClaimSpec{
+			AccessModes: storage.VolumeClaimTemplate.AccessModes,
+			Resources:   storage.VolumeClaimTemplate.Resources,
+		}
+
+		// Set default access modes if not specified
+		if len(spec.AccessModes) == 0 {
+			spec.AccessModes = CreatePersistentVolumeAccessModes()
+		}
+
+		// Determine provisioning type based on storageClassName
+		if storage.VolumeClaimTemplate.StorageClassName == nil || *storage.VolumeClaimTemplate.StorageClassName == "" {
+			// Static provisioning: use selector and empty storage class
+			if storage.VolumeClaimTemplate.Selector == nil {
+				return corev1.PersistentVolumeClaimSpec{},
+					fmt.Errorf("selector is required for static provisioning in storage: %s", storage.Name)
+			}
+			spec.Selector = storage.VolumeClaimTemplate.Selector
+			// Set empty storage class for static provisioning
+			emptyStorageClass := ""
+			spec.StorageClassName = &emptyStorageClass
+		} else {
+			// Dynamic provisioning: use storage class
+			spec.StorageClassName = storage.VolumeClaimTemplate.StorageClassName
+		}
+
+		return spec, nil
+	}
+
+	// 2. If StorageClassName exists (Dynamic provisioning - legacy method)
+	if len(storage.StorageClassName) > 0 {
 		return corev1.PersistentVolumeClaimSpec{
 			AccessModes:      CreatePersistentVolumeAccessModes(),
 			Resources:        CreateVolumeResourceRequirements(storage.Size),
 			StorageClassName: &storage.StorageClassName,
 		}, nil
 	}
+
+	// 3. If VolumeName exists (Reference existing PV - deprecated)
+	if len(storage.VolumeName) > 0 {
+		return corev1.PersistentVolumeClaimSpec{
+			AccessModes: CreatePersistentVolumeAccessModes(),
+			Resources:   CreateVolumeResourceRequirements(storage.Size),
+			VolumeName:  storage.VolumeName,
+		}, nil
+	}
+
 	return corev1.PersistentVolumeClaimSpec{},
-		fmt.Errorf("both VolumeName and StorageClassName are empty for storage: %s", storage.Name)
+		fmt.Errorf("no storage configuration provided for storage: %s", storage.Name)
 }
 
 func CreatePersistentVolumeAccessModes() []corev1.PersistentVolumeAccessMode {
@@ -53,9 +89,16 @@ func NewPersistentVolumeClaims(cubridDB *cubridv1.CubridDB) ([]corev1.Persistent
 		if err != nil {
 			return nil, fmt.Errorf("failed to create PVC spec for storage '%s': %w", storage.Name, err)
 		}
+
+		// Determine PVC name
+		pvcName := storage.Name
+		if storage.VolumeClaimTemplate != nil && storage.VolumeClaimTemplate.Metadata != nil {
+			pvcName = storage.VolumeClaimTemplate.Metadata.Name
+		}
+
 		pvc := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: storage.Name,
+				Name: pvcName,
 			},
 			Spec: spec,
 		}

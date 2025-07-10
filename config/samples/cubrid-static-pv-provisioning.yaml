@@ -1,0 +1,200 @@
+# PersistentVolumes for Static Provisioning
+# These PVs must be created before applying the static provisioning CubridDB
+# 
+# Usage:
+# 1. kubectl apply -f pvs-for-static-provisioning.yaml
+# 2. kubectl apply -f cubrid_static_provisioning.yaml
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-database-pv-0
+  labels:
+    type: cubrid-database
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/database-0
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-database-pv-1
+  labels:
+    type: cubrid-database
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/database-1
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-database-pv-2
+  labels:
+    type: cubrid-database
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/database-2
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-logs-pv-0
+  labels:
+    type: cubrid-logs
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/logs-0
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-logs-pv-1
+  labels:
+    type: cubrid-logs
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/logs-1
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-logs-pv-2
+  labels:
+    type: cubrid-logs
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/logs-2    
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-conf-pv-0
+  labels:
+    type: cubrid-conf
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/conf-0
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-conf-pv-1
+  labels:
+    type: cubrid-conf
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/conf-1
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-conf-pv-2
+  labels:
+    type: cubrid-conf
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/conf-2    
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-backup-pv-0
+  labels:
+    type: cubrid-backup
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/backup-0
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-backup-pv-1
+  labels:
+    type: cubrid-backup
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/backup-1 
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cubrid-backup-pv-2
+  labels:
+    type: cubrid-backup
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/cubrid/backup-2 
+

@@ -82,6 +82,7 @@ func (c *CubridDB) ValidateCreate() (admission.Warnings, error) {
 		c.validateCMSService,
 		c.validateBrokerServicePort,
 		c.validateHAPort,
+		c.validateStorageConfiguration,
 	}
 
 	for _, fn := range validateFns {
@@ -202,6 +203,7 @@ func (c *CubridDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error
 		func() error { return c.validateUpdateStorages(old) },
 		func() error { return c.validateUpdateStartPort(old) },
 		func() error { return c.validateBrokerServicePort() },
+		c.validateStorageConfiguration,
 	}
 
 	for _, fn := range validateFns {
@@ -416,4 +418,30 @@ func (c *CubridDB) validateHAPort() error {
 	}
 
 	return nil
+}
+
+func (c *CubridDB) validateStorageConfiguration() error {
+	cubriddblog.Info("validateStorageConfiguration", "name", c.Name)
+
+	var allErrs field.ErrorList
+
+	for i, storage := range c.Spec.Storage {
+		if err := storage.ValidateStorage(); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec").Child("storage").Index(i),
+				storage,
+				err.Error(),
+			))
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+
+	return apierrors.NewInvalid(
+		schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"},
+		c.Name,
+		allErrs,
+	)
 }

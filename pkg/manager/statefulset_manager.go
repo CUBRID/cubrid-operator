@@ -51,6 +51,11 @@ func NewStatefulSetManager(client client.Client, scheme *runtime.Scheme) (*State
 func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
 	stslogger.V(1).Info("Handling StatefulSet for CubridDB")
 
+	// Validate storage configuration
+	if err := r.validateStorageConfiguration(cubridDB); err != nil {
+		return fmt.Errorf("invalid storage configuration: %v", err)
+	}
+
 	var replicaNum int32 = 1
 	serviceName := res.CreateHeadlessServiceName(cubridDB.Name)
 
@@ -64,11 +69,42 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 		{Name: DEF.DBBackupVolumeName, MountPath: DEF.DBBackupMountPath},
 	}
 
+	// Get PVC names from storage configuration
+	var confPVCName, databasePVCName, backupPVCName, logsPVCName string
+	for _, storage := range cubridDB.Spec.Storage {
+		switch storage.Type {
+		case DEF.StorageType_conf:
+			if storage.VolumeClaimTemplate != nil && storage.VolumeClaimTemplate.Metadata != nil {
+				confPVCName = storage.VolumeClaimTemplate.Metadata.Name
+			} else {
+				confPVCName = storage.Name
+			}
+		case DEF.StorageType_Database:
+			if storage.VolumeClaimTemplate != nil && storage.VolumeClaimTemplate.Metadata != nil {
+				databasePVCName = storage.VolumeClaimTemplate.Metadata.Name
+			} else {
+				databasePVCName = storage.Name
+			}
+		case DEF.StorageType_backup:
+			if storage.VolumeClaimTemplate != nil && storage.VolumeClaimTemplate.Metadata != nil {
+				backupPVCName = storage.VolumeClaimTemplate.Metadata.Name
+			} else {
+				backupPVCName = storage.Name
+			}
+		case DEF.StorageType_Logs:
+			if storage.VolumeClaimTemplate != nil && storage.VolumeClaimTemplate.Metadata != nil {
+				logsPVCName = storage.VolumeClaimTemplate.Metadata.Name
+			} else {
+				logsPVCName = storage.Name
+			}
+		}
+	}
+
 	recoveryConfVolumeMountSpecs := []res.VolumeMountConfig{
-		{Name: DEF.ConfStorageVolumeName, MountPath: DEF.ConfMountPath},
-		{Name: DEF.DatabaseStorageVolumeName, MountPath: DEF.DatabaseMountPath},
-		{Name: DEF.BackupDBStorageVolumeName, MountPath: DEF.BackupDBMountPath},
-		{Name: DEF.LogsStorageVolumeName, MountPath: DEF.LogsMountPath},
+		{Name: confPVCName, MountPath: DEF.ConfMountPath},
+		{Name: databasePVCName, MountPath: DEF.DatabaseMountPath},
+		{Name: backupPVCName, MountPath: DEF.BackupDBMountPath},
+		{Name: logsPVCName, MountPath: DEF.LogsMountPath},
 		{Name: DEF.ConfBackupVolumeName, MountPath: DEF.ConfBackupMountPath},
 		{Name: DEF.LogsBackupVolumeName, MountPath: DEF.LogsBackupMountPath},
 	}
@@ -425,5 +461,15 @@ func (r *StatefulSetManager) syncStatefulSetSpec(
 	}
 
 	stslogger.V(1).Info("syncStatefulSetSpec end")
+	return nil
+}
+
+// validateStorageConfiguration validates the storage configuration for all storages
+func (r *StatefulSetManager) validateStorageConfiguration(cubridDB *cubridv1.CubridDB) error {
+	for _, storage := range cubridDB.Spec.Storage {
+		if err := storage.ValidateStorage(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
