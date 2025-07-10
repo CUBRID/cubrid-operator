@@ -84,9 +84,10 @@ type HAmodeType struct {
 }
 
 type CubridRef struct {
-	Name        string `json:"name,omitempty"`
-	Namespace   string `json:"namespace,omitempty"`
-	ReplicaLink string `json:"replicaLink,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	// ReplicaLink is for internal use only. Not user-settable.
+	ReplicaLink string `json:"-"` // internal use only
 }
 
 type Affinity struct {

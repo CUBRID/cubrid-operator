@@ -128,8 +128,6 @@ spec:
                             type: string
                           namespace:
                             type: string
-                          replicaLink:
-                            type: string
                         type: object
                       type:
                         type: string
