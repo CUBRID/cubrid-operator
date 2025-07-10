@@ -22,6 +22,17 @@ namespace: "cubrid"
 # -- Whether the operator should watch CRDs only in its own namespace or not.
 currentNamespaceOnly: false
 
+# RBAC Configuration
+rbac:
+  # -- Whether to create user-facing ClusterRoles for CUBRID and Backup DB management
+  # Set to false if you want to manage permissions manually or use custom roles
+  createUserRoles: false
+  
+  # -- Whether to create editor ClusterRoles (create, update, delete permissions)
+  createEditorRoles: false
+  
+  # -- Whether to create viewer ClusterRoles (read-only permissions)  
+  createViewerRoles: ture
 
 # cubrid operator 
 operator:

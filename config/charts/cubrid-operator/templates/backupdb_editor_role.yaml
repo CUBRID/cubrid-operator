@@ -1,3 +1,4 @@
+{{- if and .Values.rbac.createUserRoles .Values.rbac.createEditorRoles }}
 # permissions for end users to edit backupdbs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -29,3 +30,4 @@ rules:
   - backupdbs/status
   verbs:
   - get
+{{- end }}

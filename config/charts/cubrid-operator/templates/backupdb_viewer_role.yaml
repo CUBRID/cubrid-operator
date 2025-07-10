@@ -1,3 +1,4 @@
+{{- if and .Values.rbac.createUserRoles .Values.rbac.createViewerRoles }}
 # permissions for end users to view backupdbs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -25,3 +26,4 @@ rules:
   - backupdbs/status
   verbs:
   - get
+{{- end }}
