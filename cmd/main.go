@@ -105,7 +105,12 @@ func init() {
 		"The address the webhook probe endpoint binds to.",
 	)
 	webhookCmd.Flags().IntVar(&webhookPort, "webhook-port", 8443, "The port the webhook server serves on.")
-	webhookCmd.Flags().StringVar(&webhookServiceName, "webhook-service-name", "", "The name of the webhook service")
+	webhookCmd.Flags().StringVar(
+		&webhookServiceName,
+		"webhook-service-name",
+		"cubrid-operator-webhook-service",
+		"The name of the webhook service",
+	)
 	webhookCmd.Flags().StringVar(
 		&webhookNamespace,
 		"webhook-namespace",
@@ -127,19 +132,19 @@ func init() {
 	webhookCmd.Flags().StringVar(
 		&webhookSecretName,
 		"webhook-secret-name",
-		"",
+		"cubrid-operator-webhook-cert",
 		"The name of the secret used by the webhook server",
 	)
 	webhookCmd.Flags().StringVar(
 		&webhookMutatingName,
 		"webhook-mutating-name",
-		"",
+		"cubrid-operator-webhook-mutating",
 		"The name of the webhook mutating",
 	)
 	webhookCmd.Flags().StringVar(
 		&webhookValidatingName,
 		"webhook-validating-name",
-		"",
+		"cubrid-operator-webhook-validating",
 		"The name of the webhook validating",
 	)
 	webhookCmd.Flags().StringVar(
