@@ -260,6 +260,10 @@ CUBRID Operator는 동적 프로비저닝과 정적 프로비저닝을 모두 지원합니다. 상세한 설
 
 CUBRID Operator는 브로커 서비스, CMS 서비스, 헤드리스 서비스 등을 CR 기반으로 관리합니다. 서비스 구성 및 관리 방법은 [서비스 관리 가이드](./docs/service-management.md)를 참조하세요.
 
+### Ingress CMS Service
+
+CUBRID Operator는 Ingress를 통해 CMS 서비스에 접근할 수 있는 기능을 제공합니다. 도메인 이름을 사용하여 CUBRID 관리 인터페이스에 접근하는 방법은 [Ingress CMS 서비스 가이드](./docs/ingress-cms-guide.md)를 참조하세요.
+
 ### Helm Chart Parameters
 
 자세한 Helm Chart 파라미터는 [Helm Chart README](./deploy/charts/cubrid-operator/README.md)를 참조하세요.
