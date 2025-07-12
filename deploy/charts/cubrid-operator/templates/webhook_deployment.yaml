@@ -24,6 +24,7 @@ spec:
       containers:
       - name: {{ $fullName }}-webhook-dep
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: Always
         command: ["./manager"]
         args:
           - webhook
@@ -35,6 +36,7 @@ spec:
           - --webhook-mutating-name={{ include "cubrid-operator.fullname" . }}-webhook-mutating
           - --webhook-validating-name={{ include "cubrid-operator.fullname" . }}-webhook-validating
           - --webhook-deployment-name={{ $fullName }}-webhook-dep
+          - --webhook-cert-manager-type={{ .Values.webhook.certManagerType }}
         ports:
         - name: webhook
           containerPort: {{ .Values.webhook.ports.webhook }}
@@ -51,25 +53,9 @@ spec:
           {{- toYaml . | nindent 12 }}
         {{- end }}
         livenessProbe:
-          httpGet:
-            path: /healthz
-            port: probe
-            scheme: HTTP
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 1
-          failureThreshold: 3
-          successThreshold: 1
+          {{- toYaml .Values.webhook.livenessProbe | nindent 10 }}
         readinessProbe:
-          httpGet:
-            path: /readyz
-            port: probe
-            scheme: HTTP
-          initialDelaySeconds: 10
-          periodSeconds: 60
-          timeoutSeconds: 1
-          failureThreshold: 1
-          successThreshold: 1
+          {{- toYaml .Values.webhook.readinessProbe | nindent 10 }}
       volumes:
       - name: cert-dir
         secret:

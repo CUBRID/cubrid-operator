@@ -395,5 +395,5 @@ kubectl get events --sort-by='.lastTimestamp'
 
 - [Kubernetes Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
 - [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/)
-- [API Reference](./API_REFERENCE.md)
+- [API Reference](./api-reference.md)
 - [예시 파일](../config/samples/) 

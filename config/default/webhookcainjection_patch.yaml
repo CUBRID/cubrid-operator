@@ -1,15 +1,15 @@
 # This patch add annotation to admission webhook config and
-# the variables $(CERT_NAME) and $(CERT_NAMESPACE) will be substituted by kustomize.
+# CA bundle injection
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: cubrid-operator-webhook-validating
   annotations:
-    cert-manager.io/inject-ca-from: $(CERT_NAMESPACE)/$(CERT_NAME)
+    cert-manager.io/inject-ca-from: cubrid/serving-cert
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: cubrid-operator-webhook-mutating
   annotations:
-    cert-manager.io/inject-ca-from: $(CERT_NAMESPACE)/$(CERT_NAME) 
+    cert-manager.io/inject-ca-from: cubrid/serving-cert 

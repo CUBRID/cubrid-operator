@@ -28,8 +28,13 @@ CubridDB는 CUBRID 데이터베이스 인스턴스를 관리하기 위한 Custom
 
 CubridDBSpec은 CubridDB의 원하는 상태를 정의합니다.
 
+**ContainerTemplate 필드들:**
+CubridDBSpec은 ContainerTemplate을 임베드하여 컨테이너 관련 설정을 포함합니다.
+
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
+| `imagePullPolicy` | [PullPolicy](#pullpolicy) | No | `IfNotPresent` | 이미지 풀 정책 |
+| `resources` | [ResourceRequirements](#resourcerequirements) | No | - | 컨테이너 리소스 요구사항 (CPU, 메모리) |
 | `replication` | [Replication](#replication) | No | `{enable: false, replicas: 1}` | 복제 설정 |
 | `affinity` | [Affinity](#affinity) | No | `{enableAntiAffinity: false}` | 파드 어피니티 설정 |
 | `broker` | [Broker](#broker)[] | No | `[]` | 브로커 서비스 설정 |
@@ -40,7 +45,6 @@ CubridDBSpec은 CubridDB의 원하는 상태를 정의합니다.
 | `storage` | [Storage](#storage)[] | No | `[]` | 스토리지 설정 |
 | `label` | string | No | `""` | 추가 라벨 |
 | `updateStrategy` | [StatefulSetUpdateStrategy](#statefulsetupdatestrategy) | No | `{type: RollingUpdate}` | 업데이트 전략 |
-| `imagePullPolicy` | [PullPolicy](#pullpolicy) | No | `IfNotPresent` | 이미지 풀 정책 |
 
 #### Replication
 

@@ -1,0 +1,34 @@
+{{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled (eq .Values.webhook.certManagerType "external") }}
+{{ $fullName := include "cubrid-operator.fullname" . }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $fullName }}-webhook-serving-cert
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+spec:
+  dnsNames:
+  - {{ include "cubrid-operator-webhook.serviceName" . }}.{{ .Values.namespace | default .Release.Namespace }}.svc
+  - {{ include "cubrid-operator-webhook.serviceName" . }}.{{ .Values.namespace | default .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ $fullName }}-webhook-selfsigned-issuer
+  secretName: {{ .Values.webhook.secretName }}
+  duration: {{ .Values.webhook.certificate.duration }}
+  renewBefore: {{ .Values.webhook.certificate.renewBefore }}
+  privateKey:
+    algorithm: {{ .Values.webhook.certificate.privateKey.algorithm }}
+    encoding: {{ .Values.webhook.certificate.privateKey.encoding }}
+    size: {{ .Values.webhook.certificate.privateKey.size }}
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $fullName }}-webhook-selfsigned-issuer
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+spec:
+  selfSigned: {}
+{{ end }} 

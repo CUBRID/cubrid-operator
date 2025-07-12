@@ -29,7 +29,7 @@ spec:
           - --webhook-mutating-name=cubrid-operator-webhook-mutating
           - --webhook-validating-name=cubrid-operator-webhook-validating
           - --webhook-deployment-name=cubrid-operator-webhook-dep
-          - --webhook-cert-manager-type=internal
+          - --webhook-cert-manager-type=$(CERT_MANAGER_TYPE)
         ports:
         - name: webhook
           containerPort: 8443

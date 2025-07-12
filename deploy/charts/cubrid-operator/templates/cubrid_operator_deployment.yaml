@@ -73,6 +73,12 @@ spec:
           #- "--leader-elect=true"
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: Always
+        #image: harbor.demo.com/cubrid/operator:0.0.1         # innogrid
+        #image: harbor.nhis.okestro.cloud/cubrid/operator:0.0.1  # okestro
+        # image: quay-server.cloud.nhis.or.kr:8443/cubrid/operator:0.0.1  # openshift
+        # image: ipr-bastion1.in-cloud.nhis.or.kr:8443/cubrid/operator:0.0.1 # poc openshift
+        # image: okestroharbor.in-cloud.nhis.or.kr/cubrid/operator:0.0.1 # poc okestro
+        # image: harbor.in-cloud.nhis.or.kr/cubrid/operator:0.0.1 # poc innogrid
 
         name: manager
         securityContext:

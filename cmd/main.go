@@ -235,18 +235,6 @@ var webhookCmd = &cobra.Command{
 			if webhookCertDir == "" {
 				webhookCertDir = certmanager.DefaultCertificateDir
 			}
-
-			// Check if certificate files exist
-			certPath := filepath.Join(webhookCertDir, "tls.crt")
-			keyPath := filepath.Join(webhookCertDir, "tls.key")
-			if _, err := os.Stat(certPath); os.IsNotExist(err) {
-				setupLog.Error(err, "Certificate file not found", "path", certPath)
-				os.Exit(1)
-			}
-			if _, err := os.Stat(keyPath); os.IsNotExist(err) {
-				setupLog.Error(err, "Key file not found", "path", keyPath)
-				os.Exit(1)
-			}
 		} else {
 			setupLog.Info("Internal cert-manager")
 			if webhookCertDir == "" {

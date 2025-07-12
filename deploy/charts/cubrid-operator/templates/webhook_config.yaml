@@ -6,7 +6,7 @@ metadata:
   name: {{ $fullName }}-webhook-mutating
   annotations:
     {{- if eq .Values.webhook.certManagerType "external" }}
-    cert-manager.io/inject-ca-from: "{{ .Release.Namespace }}/{{ .Values.webhook.secretName }}"
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ $fullName }}-webhook-serving-cert
     {{- end }}
 webhooks:
 - admissionReviewVersions:
@@ -16,9 +16,6 @@ webhooks:
       name: {{ include "cubrid-operator-webhook.serviceName" . }}
       namespace: {{ .Values.namespace | default .Release.Namespace }}
       path: /mutate-k8s-cubrid-com-v1-backupdb
-    {{- if eq .Values.webhook.certManagerType "external" }}
-    caBundle: {{ .Values.webhook.cabundle }}
-    {{- end }}
   failurePolicy: Fail
   name: mbackupdb.kb.io
   rules:
@@ -48,9 +45,6 @@ webhooks:
       name: {{ include "cubrid-operator-webhook.serviceName" . }}
       namespace: {{ .Values.namespace | default .Release.Namespace }}
       path: /mutate-k8s-cubrid-com-v1-cubriddb
-    {{- if eq .Values.webhook.certManagerType "external" }}
-    caBundle: {{ .Values.webhook.cabundle }}
-    {{- end }}
   failurePolicy: Fail
   name: mcubriddb.kb.io
   rules:
@@ -80,7 +74,7 @@ metadata:
   name: {{ $fullName }}-webhook-validating
   annotations:
     {{- if eq .Values.webhook.certManagerType "external" }}
-    cert-manager.io/inject-ca-from: "{{ .Release.Namespace }}/{{ .Values.webhook.secretName }}"
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ $fullName }}-webhook-serving-cert
     {{- end }}
 webhooks:
 - admissionReviewVersions:
@@ -90,9 +84,6 @@ webhooks:
       name: {{ include "cubrid-operator-webhook.serviceName" . }}
       namespace: {{ .Values.namespace | default .Release.Namespace }}
       path: /validate-k8s-cubrid-com-v1-backupdb
-    {{- if eq .Values.webhook.certManagerType "external" }}
-    caBundle: {{ .Values.webhook.cabundle }}
-    {{- end }}
   failurePolicy: Fail
   name: vbackupdb.kb.io
   rules:
@@ -113,7 +104,7 @@ webhooks:
       {{- range .resources }}
       - {{ . | quote }}
       {{- end }}
-  {{- end }}
+{{- end }}
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -122,10 +113,7 @@ webhooks:
       name: {{ include "cubrid-operator-webhook.serviceName" . }}
       namespace: {{ .Values.namespace | default .Release.Namespace }}
       path: /validate-k8s-cubrid-com-v1-cubriddb
-    {{- if eq .Values.webhook.certManagerType "external" }}
-    caBundle: {{ .Values.webhook.cabundle }}
-    {{- end }}
-  failurePolicy: {{ .Values.webhook.failurePolicy | default "Fail" }}
+  failurePolicy: Fail
   name: vcubriddb.kb.io
   rules:
   {{- range .Values.webhook.crules }}
@@ -145,7 +133,6 @@ webhooks:
       {{- range .resources }}
       - {{ . | quote }}
       {{- end }}
-  {{- end }}
-  sideEffects: None
-  timeoutSeconds: {{ .Values.webhook.timeoutSeconds | default 5 }}
 {{- end }}
+  sideEffects: None
+{{ end }}

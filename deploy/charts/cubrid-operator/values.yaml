@@ -6,11 +6,8 @@ replicaCount: 1
 
 image:
   repository: airnet73/operator
-
-  # Overrides the image tag whose default is the chart appVersion.
   tag: latest
   pullPolicy: IfNotPresent
-
 
 imagePullSecrets: []
 nameOverride: ""
@@ -18,50 +15,8 @@ fullnameOverride: ""
 
 namespace: "cubrid"
 
-
 # -- Whether the operator should watch CRDs only in its own namespace or not.
 currentNamespaceOnly: false
-
-# RBAC Configuration
-rbac:
-  # -- Whether to create user-facing ClusterRoles for CUBRID and Backup DB management
-  # Set to false if you want to manage permissions manually or use custom roles
-  createUserRoles: false
-  
-  # -- Whether to create editor ClusterRoles (create, update, delete permissions)
-  createEditorRoles: false
-  
-  # -- Whether to create viewer ClusterRoles (read-only permissions)  
-  createViewerRoles: ture
-
-# cubrid operator 
-operator:
-  enabled: true
-  serviceAccount:
-    enabled: true
-    name: ""
-  clusterRoleName:
-    name: ""
-  clusterRoleBindingName:
-    name: ""
-  electionRoleName:
-    name: ""
-  electionRoleBindingName:
-    name: ""
-  cubriddbEditClusterRoleName: 
-    name: ""
-  cubriddbViewClusterRoleName: 
-    name: ""
-  backupdbEditClusterRoleName:
-    name: ""
-  backupdbViewClusterRoleName:
-    name: ""
-  
-  ports:
-    probe: 8081
-
-
-
 
 # Webhook Configurations
 webhook:
@@ -70,8 +25,20 @@ webhook:
   namespace: ""
   certDir: /tmp/k8s-webhook-server/serving-certs
   secretName: cubrid-operator-webhook-cert
-  certManagerType: internal  
-  podAnnotations: {}  
+  # -- Certificate manager type (internal or external)
+  certManagerType: internal
+  # -- Certificate configuration when using external cert-manager
+  certificate:
+    # -- Duration of the certificate
+    duration: "8760h" # 1 year
+    # -- Time before expiry to renew the certificate
+    renewBefore: "720h" # 30 days
+    # -- Private key configuration
+    privateKey:
+      algorithm: RSA
+      encoding: PKCS1
+      size: 2048
+  podAnnotations: {}
   ports:
     webhook: 8443
     metrics: 8082
@@ -101,7 +68,7 @@ webhook:
       resources:
         - cubriddbs
 
-  # Pod
+  # Pod resources
   resources:
     limits:
       cpu: 100m
@@ -110,11 +77,11 @@ webhook:
       cpu: 50m
       memory: 64Mi
 
-  # Probe
+  # Probe configuration
   livenessProbe:
     httpGet:
       path: /healthz
-      port: 8083
+      port: probe
       scheme: HTTP
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -124,17 +91,13 @@ webhook:
   readinessProbe:
     httpGet:
       path: /readyz
-      port: 8083
+      port: probe
       scheme: HTTP
     initialDelaySeconds: 10
     periodSeconds: 10
     timeoutSeconds: 1
     failureThreshold: 3
     successThreshold: 1
-
-  # Webhook
-  failurePolicy: Fail
-  timeoutSeconds: 5
 
   serviceAccount:
     name: ""
@@ -147,6 +110,43 @@ webhook:
 
   serviceName:
     name: ""
+
+# RBAC Configuration
+rbac:
+  # -- Whether to create user-facing ClusterRoles for CUBRID and Backup DB management
+  createUserRoles: false
+  
+  # -- Whether to create editor ClusterRoles (create, update, delete permissions)
+  createEditorRoles: false
+  
+  # -- Whether to create viewer ClusterRoles (read-only permissions)  
+  createViewerRoles: true
+
+# cubrid operator 
+operator:
+  enabled: true
+  serviceAccount:
+    enabled: true
+    name: ""
+  clusterRoleName:
+    name: ""
+  clusterRoleBindingName:
+    name: ""
+  electionRoleName:
+    name: ""
+  electionRoleBindingName:
+    name: ""
+  cubriddbEditClusterRoleName: 
+    name: ""
+  cubriddbViewClusterRoleName: 
+    name: ""
+  backupdbEditClusterRoleName:
+    name: ""
+  backupdbViewClusterRoleName:
+    name: ""
+  
+  ports:
+    probe: 8081
 
 # Ingress configuration
 ingress:

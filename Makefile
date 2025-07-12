@@ -3,6 +3,9 @@ IMG ?= airnet73/operator:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
 
+# Certificate manager type (internal or external)
+CERT_MANAGER_TYPE ?= internal
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -45,14 +48,14 @@ help: ## Display this help.
 ##@ Helm Chart
 NAMESPACE := cubrid
 
-CRD_DIR := config/charts/cubrid-operator-crds/templates
+CRD_DIR := deploy/charts/cubrid-operator-crds/templates
 COMBINED_CRD_FILE := $(CRD_DIR)/crds.yaml
 
 # CRDs Path
 CRD_SOURCES := config/crd/bases/k8s.cubrid.com_cubriddbs.yaml config/crd/bases/k8s.cubrid.com_backupdbs.yaml
 
 # Helm Chart Directory and Package Configuration
-CHARTS_DIR := config/charts
+CHARTS_DIR := deploy/charts
 HELM_REPO_DIR := helm-repo
 HELM_REPO_URL := https://airnet73.github.io/test-operator
 CHARTS := cubrid-operator cubrid-operator-crds
@@ -67,6 +70,8 @@ VERSION := $(shell grep '^version:' $(CHARTS_DIR)/cubrid-operator/Chart.yaml | c
 # helm-crds 
 .PHONY: helm-crd
 helm-crd: manifests ## Generate crd file for Helm Charts
+	@echo "Creating CRD directory if it doesn't exist..."
+	@mkdir -p $(CRD_DIR)
 	@echo "Combining CRD files into $(COMBINED_CRD_FILE)..."
 	@> $(COMBINED_CRD_FILE) 
 	@cat $(CRD_SOURCES) >> $(COMBINED_CRD_FILE) 
@@ -215,9 +220,19 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
+	mkdir -p deploy/manifests
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/cubrid-operator-install.yaml
+ifeq ($(CERT_MANAGER_TYPE),external)
+	cp config/default/kustomization.yaml config/default/kustomization.yaml.bak
+	sed -i 's/#- ..\/certmanager/- ..\/certmanager/' config/default/kustomization.yaml
+	sed -i 's/#- webhookcainjection_patch.yaml/- webhookcainjection_patch.yaml/' config/default/kustomization.yaml
+	sed -i 's/#replacements:/replacements:/' config/default/kustomization.yaml
+	cp config/default/kustomization.yaml config/default/kustomization.yaml.debug
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/external/g' > deploy/manifests/cubrid-operator-install.yaml
+	mv config/default/kustomization.yaml.bak config/default/kustomization.yaml
+else
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/internal/g' > deploy/manifests/cubrid-operator-install.yaml
+endif
 
 ##@ Deployment
 
@@ -235,8 +250,19 @@ uninstall-crd: manifests kustomize ## Uninstall CRDs from the K8s cluster specif
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}  
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+ifeq ($(CERT_MANAGER_TYPE),external)
+	cp config/default/kustomization.yaml config/default/kustomization.yaml.bak
+	sed -i 's/#- ..\/certmanager/- ..\/certmanager/' config/default/kustomization.yaml
+	sed -i 's/#- webhookcainjection_patch.yaml/- webhookcainjection_patch.yaml/' config/default/kustomization.yaml
+	sed -i 's/#replacements:/replacements:/' config/default/kustomization.yaml
+	cp config/default/kustomization.yaml config/default/kustomization.yaml.debug
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/external/g' | $(KUBECTL) apply -f -
+	mv config/default/kustomization.yaml.bak config/default/kustomization.yaml
+	@echo "Debug version of kustomization.yaml saved as config/default/kustomization.yaml.debug"
+else
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/internal/g' | $(KUBECTL) apply -f -
+endif
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
