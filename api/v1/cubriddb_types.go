@@ -30,6 +30,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// ContainerTemplate defines templates to configure Container objects.
+type ContainerTemplate struct {
+	// ImagePullPolicy is the image pull policy. One of `Always`, `Never` or `IfNotPresent`. If not defined, it defaults to `IfNotPresent`.
+	// +optional
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+	// Resources describes the compute resource requirements.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
 // CubridDBSpec defines the desired state of CubridDB
 type CubridDBSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -45,7 +56,10 @@ type CubridDBSpec struct {
 	Storage            []Storage                         `json:"storage,omitempty"`
 	Label              string                            `json:"label,omitempty"`
 	UpdateStrategy     *appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
-	ImagePullPolicy    corev1.PullPolicy                 `json:"imagePullPolicy,omitempty"`
+
+	// ContainerTemplate defines templates to configure Container objects.
+	// +optional
+	ContainerTemplate `json:",inline"`
 }
 
 // CubridDBStatus defines the observed state of CubridDB
@@ -235,6 +249,7 @@ func (c *CubridDB) SetDefaults() {
 	c.InitUpdateStrategy()
 	c.InitCMSService()
 	c.InitHAPort()
+	c.InitContainerTemplate()
 }
 
 func (c *CubridDB) Replication() Replication {
@@ -495,4 +510,14 @@ func (c *CubridDB) GetHAPort() int32 {
 		return DEF.SVC_HA_PORT
 	}
 	return *c.Spec.HAPort.Port
+}
+
+// InitContainerTemplate sets defaults for container template configuration
+func (c *CubridDB) InitContainerTemplate() {
+	// Set default ImagePullPolicy if not specified
+	if c.Spec.ImagePullPolicy == "" {
+		c.Spec.ImagePullPolicy = corev1.PullIfNotPresent
+	}
+	// Resources field is already a pointer, so it can be nil by default
+	// No need to set default values for Resources as it's optional
 }
