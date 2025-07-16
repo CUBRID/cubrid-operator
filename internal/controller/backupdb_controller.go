@@ -590,8 +590,8 @@ func (r *BackupDBReconciler) updateStatus(ctx context.Context, backupPod string,
 			}
 		}
 
-		// Update CombinedStatus
-		updatedBackupDB.Status.CombinedStatus = fmt.Sprintf("%d/%d", completeCount, totalPods)
+		// Update OverallStatus
+		updatedBackupDB.Status.OverallStatus = fmt.Sprintf("%d/%d", completeCount, totalPods)
 
 		// Attempt to update status
 		if err := r.Status().Update(ctx, updatedBackupDB); err != nil {

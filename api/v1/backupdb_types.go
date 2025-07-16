@@ -49,8 +49,8 @@ type StorageRef struct {
 
 // BackupDBStatus defines the observed state of BackupDB
 type BackupDBStatus struct {
-	BackupStatus   map[string]PodsStatus `json:"backupStatus,omitempty"`
-	CombinedStatus string                `json:"combinedStatus,omitempty"`
+	BackupStatus  map[string]PodsStatus `json:"backupStatus,omitempty"`
+	OverallStatus string                `json:"overallStatus,omitempty"`
 }
 
 type PodsStatus struct {
@@ -64,7 +64,7 @@ type PodsStatus struct {
 //+kubebuilder:printcolumn:name="Schedule",type=string,description="Command of the BackupDB",JSONPath=".spec.schedules.schedule"
 //+kubebuilder:printcolumn:name="Command",type=string,description="Command of the BackupDB",JSONPath=".spec.schedules.args"
 //+kubebuilder:printcolumn:name="File Path",type=string,description="File path for the backup script",JSONPath=".spec.schedules.filepath"
-//+kubebuilder:printcolumn:name="Status",type=string,description="Status of the command execution",JSONPath=".status.combinedStatus"
+//+kubebuilder:printcolumn:name="Status",type=string,description="Status of the command execution",JSONPath=".status.overallStatus"
 //+kubebuilder:printcolumn:name="Age",type=date,description="Time duration since creation of the resource",JSONPath=".metadata.creationTimestamp"
 
 // BackupDB is the Schema for the backupdbs API
