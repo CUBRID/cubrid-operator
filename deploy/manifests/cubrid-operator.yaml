@@ -40,7 +40,7 @@ spec:
       name: File Path
       type: string
     - description: Status of the command execution
-      jsonPath: .status.combinedStatus
+      jsonPath: .status.overallStatus
       name: Status
       type: string
     - description: Time duration since creation of the resource
@@ -113,7 +113,7 @@ spec:
                       type: string
                   type: object
                 type: object
-              combinedStatus:
+              overallStatus:
                 type: string
             type: object
         type: object
@@ -204,30 +204,23 @@ spec:
                   type: object
                 type: array
               cmsService:
-                description: CMSServiceConfig defines the configuration for CMS services
+                description: CMSService defines the configuration for CMS services
                 properties:
-                  enabled:
-                    description: Enabled indicates whether CMS service should be created
-                    type: boolean
                   port:
                     description: Port is the container port number for CMS
                     format: int32
                     type: integer
                   startPort:
                     description: StartPort is the starting NodePort number for CMS
-                      services
+                      services (used when type=NodePort)
                     format: int32
                     type: integer
-                type: object
-              haPort:
-                description: HAPortConfig defines the configuration for HA port
-                properties:
-                  port:
-                    description: |-
-                      Port is the port number for the HA port
-                      Default is 59901 (CUBRID HA port)
-                    format: int32
-                    type: integer
+                  type:
+                    description: Type determines the CMS service type
+                    enum:
+                    - NodePort
+                    - Ingress
+                    type: string
                 type: object
               image:
                 type: string
@@ -247,6 +240,12 @@ spec:
                 properties:
                   enable:
                     type: boolean
+                  haPort:
+                    description: |-
+                      HAPort is the port number for the HA port (used when enable=true)
+                      Default is 59901 (CUBRID HA port)
+                    format: int32
+                    type: integer
                   hamodeType:
                     properties:
                       cubridRef:
@@ -1213,43 +1212,9 @@ spec:
         secret:
           secretName: cubrid-operator-webhook-cert
 ---
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: serving-cert
-  namespace: cubrid
-spec:
-  dnsNames:
-  - cubrid-operator-webhook-service.cubrid.svc
-  - cubrid-operator-webhook-service.cubrid.svc.cluster.local
-  duration: 8760h0m0s
-  issuerRef:
-    kind: Issuer
-    name: selfsigned-issuer
-  privateKey:
-    algorithm: RSA
-    encoding: PKCS1
-    size: 2048
-  renewBefore: 720h0m0s
-  secretName: cubrid-operator-webhook-cert
-  usages:
-  - server auth
-  - digital signature
-  - key encipherment
----
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: selfsigned-issuer
-  namespace: cubrid
-spec:
-  selfSigned: {}
----
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  annotations:
-    cert-manager.io/inject-ca-from: cubrid/serving-cert
   name: cubrid-operator-webhook-mutating
 webhooks:
 - admissionReviewVersions:
@@ -1298,8 +1263,6 @@ webhooks:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    cert-manager.io/inject-ca-from: cubrid/serving-cert
   name: cubrid-operator-webhook-validating
 webhooks:
 - admissionReviewVersions:

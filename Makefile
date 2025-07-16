@@ -228,10 +228,10 @@ ifeq ($(CERT_MANAGER_TYPE),external)
 	sed -i 's/#- webhookcainjection_patch.yaml/- webhookcainjection_patch.yaml/' config/default/kustomization.yaml
 	sed -i 's/#replacements:/replacements:/' config/default/kustomization.yaml
 	cp config/default/kustomization.yaml config/default/kustomization.yaml.debug
-	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/external/g' > deploy/manifests/cubrid-operator-install.yaml
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/external/g' > deploy/manifests/cubrid-operator.yaml
 	mv config/default/kustomization.yaml.bak config/default/kustomization.yaml
 else
-	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/internal/g' > deploy/manifests/cubrid-operator-install.yaml
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/internal/g' > deploy/manifests/cubrid-operator.yaml
 endif
 
 ##@ Deployment
