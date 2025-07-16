@@ -448,22 +448,30 @@ func (c *CubridDB) initHAPort() {
 func (c *CubridDB) validateHAPort() error {
 	cubriddblog.Info("validateHAPort", "name", c.Name)
 
-	if c.Spec.HAPort == nil {
-		return nil
-	}
+	var allErrs field.ErrorList
 
-	if c.Spec.HAPort.Port != nil {
-		if *c.Spec.HAPort.Port < 1 || *c.Spec.HAPort.Port > 65535 {
-			return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
-				field.Invalid(field.NewPath("spec", "haPort", "port"),
-					*c.Spec.HAPort.Port,
-					"port must be between 1 and 65535",
-				),
-			})
+	// Only validate HA port when replication is enabled
+	if c.Spec.Replication != nil && c.Spec.Replication.Enable {
+		if c.Spec.Replication.HAPort != nil {
+			if *c.Spec.Replication.HAPort < 1 || *c.Spec.Replication.HAPort > 65535 {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "replication", "haPort"),
+					*c.Spec.Replication.HAPort,
+					"haPort must be between 1 and 65535",
+				))
+			}
 		}
 	}
 
-	return nil
+	if len(allErrs) == 0 {
+		return nil
+	}
+
+	return apierrors.NewInvalid(
+		schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"},
+		c.Name,
+		allErrs,
+	)
 }
 
 func (c *CubridDB) validateStorageConfiguration() error {

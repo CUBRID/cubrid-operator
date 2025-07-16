@@ -50,7 +50,6 @@ type CubridDBSpec struct {
 	Affinity           *Affinity                         `json:"affinty,omitempty"`
 	Broker             []Broker                          `json:"broker,omitempty"`
 	CMSService         *CMSService                       `json:"cmsService,omitempty"`
-	HAPort             *HAPortConfig                     `json:"haPort,omitempty"`
 	Image              string                            `json:"image,omitempty"`
 	InitContainerImage string                            `json:"initContainerImage,omitempty"`
 	Storage            []Storage                         `json:"storage,omitempty"`
@@ -92,6 +91,9 @@ type Replication struct {
 	Enable     bool        `json:"enable,omitempty" webhook:"inmutable"`
 	Replicas   int32       `json:"replicas,omitempty"`
 	HAmodeType *HAmodeType `json:"hamodeType,omitempty" webhook:"inmutable"`
+	// HAPort is the port number for the HA port (used when enable=true)
+	// Default is 59901 (CUBRID HA port)
+	HAPort *int32 `json:"haPort,omitempty"`
 }
 
 type HAmodeType struct {
@@ -135,14 +137,6 @@ type CMSService struct {
 	// StartPort is the starting NodePort number for CMS services (used when type=NodePort)
 	StartPort *int32 `json:"startPort,omitempty"`
 	// Port is the container port number for CMS
-	Port *int32 `json:"port,omitempty"`
-}
-
-
-// HAPortConfig defines the configuration for HA port
-type HAPortConfig struct {
-	// Port is the port number for the HA port
-	// Default is 59901 (CUBRID HA port)
 	Port *int32 `json:"port,omitempty"`
 }
 
@@ -498,25 +492,24 @@ func (c *CubridDB) GetCMSServiceType() string {
 }
 
 func (c *CubridDB) InitHAPort() {
-	// Create HAPort only if it is nil
-	if c.Spec.HAPort == nil {
-		cubriddblog.Info("InitHAPort HAPort is nil", "name", c.Name)
-		c.Spec.HAPort = &HAPortConfig{}
+	// Create Replication only if it is nil
+	if c.Spec.Replication == nil {
+		c.Spec.Replication = &Replication{}
 	}
 
-	// Set default value only if Port is nil
-	if c.Spec.HAPort.Port == nil {
+	// Set default value only if HAPort is nil
+	if c.Spec.Replication.HAPort == nil {
 		port := int32(DEF.SVC_HA_PORT)
-		c.Spec.HAPort.Port = &port
+		c.Spec.Replication.HAPort = &port
 	}
 }
 
 // GetHAPort returns the HA port number
 func (c *CubridDB) GetHAPort() int32 {
-	if c.Spec.HAPort == nil || c.Spec.HAPort.Port == nil {
+	if c.Spec.Replication.HAPort == nil {
 		return DEF.SVC_HA_PORT
 	}
-	return *c.Spec.HAPort.Port
+	return *c.Spec.Replication.HAPort
 }
 
 // InitContainerTemplate sets defaults for container template configuration
