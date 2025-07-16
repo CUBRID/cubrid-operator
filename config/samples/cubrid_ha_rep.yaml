@@ -19,7 +19,7 @@ spec:
       cubridRef:
         name: "ha-ms"
   cmsService:
-    enabled: true
+    type: Ingress
     startPort: 31190
     port: 8001
   broker:

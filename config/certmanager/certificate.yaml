@@ -1,7 +1,7 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: serving-cert
+  name: cubrid-operator-webhook-serving-cert
   namespace: cubrid
 spec:
   dnsNames:
@@ -9,7 +9,7 @@ spec:
   - cubrid-operator-webhook-service.cubrid.svc.cluster.local
   issuerRef:
     kind: Issuer
-    name: selfsigned-issuer
+    name: cubrid-operator-webhook-selfsigned-issuer
   secretName: cubrid-operator-webhook-cert
   duration: 8760h0m0s # 1 year
   renewBefore: 720h0m0s # 30 days
@@ -25,7 +25,7 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: selfsigned-issuer
+  name: cubrid-operator-webhook-selfsigned-issuer
   namespace: cubrid
 spec:
   selfSigned: {} 

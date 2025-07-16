@@ -17,7 +17,7 @@ spec:
     hamodeType:
       type: master-slave
   cmsService:
-    enabled: true
+    type: Ingress
     startPort: 31000
     port: 8001
   broker:
