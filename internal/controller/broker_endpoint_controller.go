@@ -137,10 +137,6 @@ func (r *BrokerEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	if len(podList.Items) == 0 {
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
 	// Process each broker - collect all pod statuses for each broker
 	for _, broker := range cubridDB.Spec.Broker {
 		// Collect active pod IPs for this broker
@@ -275,6 +271,29 @@ func (r *BrokerEndpointReconciler) execCommand(pod *corev1.Pod, cmd []string) (s
 func (r *BrokerEndpointReconciler) updateBrokerEndpointComplete(ctx context.Context, cubridDB *cubridv1.CubridDB, broker *cubridv1.Broker, activePodIPs, notReadyPodIPs []corev1.EndpointAddress, port int32) error {
 	endpointName := broker.Name
 
+	// Early check: if no pods are available, handle endpoint cleanup
+	if len(activePodIPs) == 0 && len(notReadyPodIPs) == 0 {
+		// Get the existing endpoint to check if it needs to be deleted
+		existingEndpoint := &corev1.Endpoints{}
+		err := r.Get(ctx, types.NamespacedName{
+			Name:      endpointName,
+			Namespace: cubridDB.Namespace,
+		}, existingEndpoint)
+
+		if err == nil {
+			// Endpoint exists but no pods are available, delete it
+			brokerEPlog.V(1).Info("No pods available, deleting endpoint", "endpoint", endpointName)
+			return r.Delete(ctx, existingEndpoint)
+		} else if client.IgnoreNotFound(err) != nil {
+			// Unexpected error
+			brokerEPlog.Error(err, "Failed to get endpoint for cleanup")
+			return err
+		}
+		// Endpoint doesn't exist and no pods available, nothing to do
+		brokerEPlog.V(1).Info("No pods available and endpoint doesn't exist, skipping", "endpoint", endpointName)
+		return nil
+	}
+
 	// Get the existing endpoint
 	existingEndpoint := &corev1.Endpoints{}
 	err := r.Get(ctx, types.NamespacedName{
@@ -330,18 +349,10 @@ func (r *BrokerEndpointReconciler) updateBrokerEndpointComplete(ctx context.Cont
 			},
 		}
 	} else {
-		// No pods available
-		desiredEndpoint.Subsets = []corev1.EndpointSubset{
-			{
-				Ports: []corev1.EndpointPort{
-					{
-						Name:     endpointName,
-						Port:     port,
-						Protocol: corev1.ProtocolTCP,
-					},
-				},
-			},
-		}
+		// This case should not be reached due to early check above
+		// But keeping it as a safety net
+		brokerEPlog.V(1).Info("No pods available (fallback case), skipping endpoint update", "endpoint", endpointName)
+		return nil
 	}
 
 	// If endpoint doesn't exist, create it
