@@ -161,7 +161,23 @@ func (c *CubridDB) validateCMSService() error {
 
 	var allErrs field.ErrorList
 
-	if c.Spec.CMSService != nil && c.Spec.CMSService.Enabled != nil && *c.Spec.CMSService.Enabled {
+	if c.Spec.CMSService != nil {
+		// Validate CMS service type
+		if c.Spec.CMSService.Type != nil {
+			serviceType := *c.Spec.CMSService.Type
+			if serviceType != DEF.CMSServiceTypeNodePort && serviceType != DEF.CMSServiceTypeIngress {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "cmsService", "type"),
+					serviceType,
+					"type must be either 'NodePort' or 'Ingress'",
+				))
+			}
+
+			// Note: Ingress controller existence will be validated during reconciliation
+			// to avoid import cycle issues in webhook
+		}
+
+		// Validate startPort (only for NodePort type)
 		if c.Spec.CMSService.StartPort != nil {
 			if *c.Spec.CMSService.StartPort < 30000 || *c.Spec.CMSService.StartPort > 32767 {
 				allErrs = append(allErrs, field.Invalid(
@@ -172,6 +188,7 @@ func (c *CubridDB) validateCMSService() error {
 			}
 		}
 
+		// Validate port
 		if c.Spec.CMSService.Port != nil {
 			if *c.Spec.CMSService.Port < 1 || *c.Spec.CMSService.Port > 65535 {
 				allErrs = append(allErrs, field.Invalid(
@@ -197,6 +214,12 @@ func (c *CubridDB) validateCMSService() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (c *CubridDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	cubriddblog.Info("validate update", "name", c.Name)
+
+	// Validate immutable fields
+	oldCubridDB := old.(*CubridDB)
+	if err := c.validateImmutableFields(oldCubridDB); err != nil {
+		return nil, err
+	}
 
 	validateFns := []func() error{
 		func() error { return c.validateUpdateHA(old) },
@@ -312,6 +335,29 @@ func (c *CubridDB) validateUpdateStartPort(old runtime.Object) error {
 					field.NewPath("spec").Child("cmsService").Child("startPort"),
 					*c.Spec.CMSService.StartPort,
 					fmt.Sprintf("CMS StartPort cannot be changed after initial creation. Current port: %d", *oldCubridDB.Spec.CMSService.StartPort)))
+			}
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
+}
+
+// validateImmutableFields validates that immutable fields have not been changed
+func (c *CubridDB) validateImmutableFields(old *CubridDB) error {
+	cubriddblog.Info("validateImmutableFields", "name", c.Name)
+	var allErrs field.ErrorList
+
+	// Validate CMS Service Type is immutable
+	if old.Spec.CMSService != nil && c.Spec.CMSService != nil {
+		if old.Spec.CMSService.Type != nil && c.Spec.CMSService.Type != nil {
+			if *old.Spec.CMSService.Type != *c.Spec.CMSService.Type {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec").Child("cmsService").Child("type"),
+					*c.Spec.CMSService.Type,
+					fmt.Sprintf("CMS Service Type cannot be changed after initial creation. Current type: %s", *old.Spec.CMSService.Type)))
 			}
 		}
 	}
