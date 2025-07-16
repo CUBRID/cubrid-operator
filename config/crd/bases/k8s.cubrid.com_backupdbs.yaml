@@ -28,7 +28,7 @@ spec:
       name: File Path
       type: string
     - description: Status of the command execution
-      jsonPath: .status.combinedStatus
+      jsonPath: .status.overallStatus
       name: Status
       type: string
     - description: Time duration since creation of the resource
@@ -101,7 +101,7 @@ spec:
                       type: string
                   type: object
                 type: object
-              combinedStatus:
+              overallStatus:
                 type: string
             type: object
         type: object

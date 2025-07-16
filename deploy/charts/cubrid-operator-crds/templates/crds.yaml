@@ -81,36 +81,33 @@ spec:
                   type: object
                 type: array
               cmsService:
-                description: CMSServiceConfig defines the configuration for CMS services
+                description: CMSService defines the configuration for CMS services
                 properties:
-                  enabled:
-                    description: Enabled indicates whether CMS service should be created
-                    type: boolean
                   port:
                     description: Port is the container port number for CMS
                     format: int32
                     type: integer
                   startPort:
                     description: StartPort is the starting NodePort number for CMS
-                      services
+                      services (used when type=NodePort)
                     format: int32
                     type: integer
-                type: object
-              haPort:
-                description: HAPortConfig defines the configuration for HA port
-                properties:
-                  port:
-                    description: |-
-                      Port is the port number for the HA port
-                      Default is 59901 (CUBRID HA port)
-                    format: int32
-                    type: integer
+                  type:
+                    description: Type determines the CMS service type
+                    enum:
+                    - NodePort
+                    - Ingress
+                    type: string
                 type: object
               image:
                 type: string
               imagePullPolicy:
-                description: PullPolicy describes a policy for if/when to pull a container
-                  image
+                description: ImagePullPolicy is the image pull policy. One of `Always`,
+                  `Never` or `IfNotPresent`. If not defined, it defaults to `IfNotPresent`.
+                enum:
+                - Always
+                - Never
+                - IfNotPresent
                 type: string
               initContainerImage:
                 type: string
@@ -120,6 +117,12 @@ spec:
                 properties:
                   enable:
                     type: boolean
+                  haPort:
+                    description: |-
+                      HAPort is the port number for the HA port (used when enable=true)
+                      Default is 59901 (CUBRID HA port)
+                    format: int32
+                    type: integer
                   hamodeType:
                     properties:
                       cubridRef:
@@ -137,7 +140,7 @@ spec:
                     type: integer
                 type: object
               resources:
-                description: ResourceRequirements describes the compute resource requirements.
+                description: Resources describes the compute resource requirements.
                 properties:
                   claims:
                     description: |-
@@ -478,7 +481,7 @@ spec:
       name: File Path
       type: string
     - description: Status of the command execution
-      jsonPath: .status.combinedStatus
+      jsonPath: .status.overallStatus
       name: Status
       type: string
     - description: Time duration since creation of the resource
@@ -551,7 +554,7 @@ spec:
                       type: string
                   type: object
                 type: object
-              combinedStatus:
+              overallStatus:
                 type: string
             type: object
         type: object
