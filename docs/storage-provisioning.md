@@ -112,10 +112,10 @@ kubectl get pods -l app=cubriddb
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: cubrid-db-pv-0
+  name: cubrid-database-pv-0
   labels:
     type: cubrid-database
-    app: cubrid-db
+    app: cubrid-database
 spec:
   capacity:
     storage: 10Gi
@@ -124,7 +124,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""  # 빈 문자열 = 정적 프로비저닝
   hostPath:
-    path: /data/cubrid/db-0
+    path: /data/cubrid/database-0
     type: DirectoryOrCreate
 ```
 
@@ -134,9 +134,9 @@ spec:
 
 ```bash
 # 각 노드에서 실행
-sudo mkdir -p /data/cubrid/db-0
-sudo chown 1000:1000 /data/cubrid/db-0
-sudo chmod 755 /data/cubrid/db-0
+sudo mkdir -p /data/cubrid/database-0
+sudo chown 1000:1000 /data/cubrid/database-0
+sudo chmod 755 /data/cubrid/database-0
 ```
 
 #### 3. CubridDB 설정
@@ -153,7 +153,7 @@ spec:
   storage:
     - name: database
       type: database
-      mountPath: /opt/cubrid/databases
+      mountPath: /home/cubrid/CUBRID/databases
       volumeClaimTemplate:
         metadata:
           name: database
@@ -190,7 +190,7 @@ kubectl apply -f cubrid-static.yaml
 kubectl get pvc
 
 # 5. 파드 상태 확인
-kubectl get pods -l app=cubriddb
+kubectl get pods -l app=cubrid-static
 ```
 
 ### 정적 프로비저닝 예시 파일
@@ -291,7 +291,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: cubrid-db-pv-0
+  name: cubrid-database-pv-0
   labels:
     type: cubrid-database
     app: cubrid-static-example
@@ -303,92 +303,8 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   hostPath:
-    path: /data/cubrid/db-0
+    path: /data/cubrid/database-0
     type: DirectoryOrCreate
-```
-
-## 문제 해결
-
-### 동적 프로비저닝 문제
-
-#### 1. StorageClass 없음
-```
-Error: no storage class is set on request and no default can be found
-```
-
-**해결 방법**:
-```bash
-# 사용 가능한 StorageClass 확인
-kubectl get storageclass
-
-# 기본 StorageClass 설정
-kubectl patch storageclass <storage-class-name> -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-```
-
-#### 2. 볼륨 프로비저닝 실패
-```
-Failed to provision volume with StorageClass "longhorn"
-```
-
-**해결 방법**:
-- 스토리지 시스템 상태 확인
-- 디스크 공간 확인
-- 스토리지 클래스 설정 확인
-
-### 정적 프로비저닝 문제
-
-#### 1. 권한 오류
-```
-Permission denied: /opt/cubrid/databases
-```
-
-**해결 방법**:
-```bash
-# 노드에서 디렉토리 권한 설정
-sudo mkdir -p /data/cubrid/db-0
-sudo chown 1000:1000 /data/cubrid/db-0
-sudo chmod 755 /data/cubrid/db-0
-```
-
-#### 2. PVC 바인딩 실패
-```
-PVC stuck in Pending state
-```
-
-**해결 방법**:
-- PV 라벨과 PVC 셀렉터 일치 확인
-- PV 상태 확인 (`kubectl get pv`)
-- 스토리지 크기 일치 확인
-
-#### 3. mountOptions 오류
-```
-mountOptions not supported for hostPath volumes
-```
-
-**해결 방법**:
-- hostPath 볼륨에서는 mountOptions 제거
-- 다른 볼륨 타입 사용 고려
-
-### 일반적인 문제 해결 명령어
-
-```bash
-# PVC 상태 확인
-kubectl get pvc
-kubectl describe pvc <pvc-name>
-
-# PV 상태 확인
-kubectl get pv
-kubectl describe pv <pv-name>
-
-# 파드 상태 확인
-kubectl get pods -l app=cubriddb
-kubectl describe pod <pod-name>
-
-# 파드 로그 확인
-kubectl logs <pod-name>
-
-# 이벤트 확인
-kubectl get events --sort-by='.lastTimestamp'
 ```
 
 ## 추가 리소스

@@ -26,7 +26,7 @@ CUBRID Operator를 설치하는 방법에는 두 가지가 있습니다:
 
 ```bash
 # Helm repo 추가
-helm repo add cubrid https://airnet73.github.io/helm-charts
+helm repo add cubrid https://cubrid.github.io/helm-charts
 helm repo update
 ```
 
@@ -52,18 +52,7 @@ helm install cubrid-operator cubrid/cubrid-operator --version <version>
 
 ### 방법 2: 로컬 Helm Chart Package 사용
 
-#### 1. Chart Package 다운로드
-
-```bash
-# Chart Package 다운로드 디렉토리 생성
-mkdir -p helm-charts && cd helm-charts
-
-# CRD와 Operator Chart Package 다운로드
-curl -LO https://github.com/airnet73/helm-charts/releases/download/cubrid-operator-crds-<version>/cubrid-operator-crds-<version>.tgz
-curl -LO https://github.com/airnet73/helm-charts/releases/download/cubrid-operator-<version>/cubrid-operator-<version>.tgz
-```
-
-또는 소스에서 직접 패키징:
+#### 1. Chart Package 생성성
 
 ```bash
 # 소스 디렉토리에서
@@ -91,10 +80,12 @@ kubectl get crds | grep cubrid
 helm install cubrid-operator ./cubrid-operator-<version>.tgz
 
 # values.yaml 파일 사용
-helm install cubrid-operator ./cubrid-operator-<version>.tgz -f values.yaml
+helm install cubrid-operator ./cubrid-operator -f values.yaml
 ```
 
 ## 사용자 정의 설정
+
+CUBRID Operator의 설치 시 다양한 설정 옵션을 통해 환경에 맞게 커스터마이징할 수 있습니다. 주요 설정 영역은 RBAC 권한 관리와 Webhook 인증서 관리입니다.
 
 ### RBAC 설정
 
@@ -111,6 +102,8 @@ helm install cubrid-operator cubrid/cubrid-operator \
 
 ### Webhook 설정
 
+CUBRID Operator의 webhook 서버는 두 가지 방식으로 TLS 인증서를 관리할 수 있습니다:
+
 ```bash
 # 외부 cert-manager 사용
 helm install cubrid-operator cubrid/cubrid-operator \
@@ -120,6 +113,8 @@ helm install cubrid-operator cubrid/cubrid-operator \
 helm install cubrid-operator cubrid/cubrid-operator \
   --set webhook.certManagerType=internal
 ```
+
+자세한 인증서 관리 설정 방법은 [cert-manager-guide.md](./cert-manager-guide.md)를 참조하세요.
 
 ## 업그레이드
 
@@ -154,7 +149,7 @@ helm uninstall cubrid-operator
 helm uninstall cubrid-operator-crds
 ```
 
-## 설정 옵션
+## Helm 설정 옵션
 
 | 매개변수 | 설명 | 기본값 |
 |----------|------|---------|
@@ -163,4 +158,4 @@ helm uninstall cubrid-operator-crds
 | `rbac.createViewerRoles` | Viewer 권한 생성 여부 | `true` |
 | `webhook.certManagerType` | 인증서 관리자 타입 (internal/external) | `internal` |
 
-더 자세한 설정 옵션은 [values.yaml](../deploy/charts/cubrid-operator/values.yaml)을 참조하세요. 
+더 자세한 설정 옵션은 [values.yaml](../deploy/charts/cubrid-operator/values.yaml) 또는 [Helm Chart 매개변수](./helm-chart-parameter.md)를 참조하세요.

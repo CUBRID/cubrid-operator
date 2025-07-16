@@ -38,9 +38,8 @@ CubridDBSpec은 ContainerTemplate을 임베드하여 컨테이너 관련 설정�
 | `replication` | [Replication](#replication) | No | `{enable: false, replicas: 1}` | 복제 설정 |
 | `affinity` | [Affinity](#affinity) | No | `{enableAntiAffinity: false}` | 파드 어피니티 설정 |
 | `broker` | [Broker](#broker)[] | No | `[]` | 브로커 서비스 설정 |
-| `cmsService` | [CMSServiceConfig](#cmsserviceconfig) | No | `{enabled: false}` | CMS 서비스 설정 |
-| `haPort` | [HAPortConfig](#haportconfig) | No | `{port: 59901}` | HA 포트 설정 |
-| `image` | string | No | `airnet73/cubrid` | CUBRID 이미지 |
+| `cmsService` | [CMSService](#CMSService) | No | `{enabled: false}` | CMS 서비스 설정 |
+| `image` | string | No | `cubrid/cubrid` | CUBRID 이미지 |
 | `initContainerImage` | string | No | `busybox` | 초기화 컨테이너 이미지 |
 | `storage` | [Storage](#storage)[] | No | `[]` | 스토리지 설정 |
 | `label` | string | No | `""` | 추가 라벨 |
@@ -54,6 +53,7 @@ CubridDBSpec은 ContainerTemplate을 임베드하여 컨테이너 관련 설정�
 |-------|------|----------|---------|-------------|
 | `enable` | boolean | No | `false` | 복제 활성화 여부 |
 | `replicas` | int32 | No | `1` | 복제본 수 |
+| `haPort` | int32 | No | `59901` | HA 포트 번호 |
 | `hamodeType` | [HAmodeType](#hamodetype) | No | `{type: "master-slave"}` | HA 모드 타입 |
 
 #### HAmodeType
@@ -84,32 +84,33 @@ HA 모드 타입을 정의합니다.
 
 #### Broker
 
-브로커 서비스 설정을 정의합니다.
+브로커 서비스 설정을 정의합니다. 배열로 여러 개의 브로커를 설정할 수 있으며, 기본값은 2개입니다.
+
+**기본 브로커 설정:**
+- **첫 번째 브로커**: `cubrid-query-editor` (포트: 30000, NodePort: 30000)
+- **두 번째 브로커**: `cubrid-broker1` (포트: 33000, NodePort: 31000)
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | string | **Yes** | - | 브로커 서비스 이름 |
 | `port` | int32 | No | `30000` | 브로커 포트 번호 |
-| `serviceType` | [ServiceType](#servicetype) | **Yes** | - | 서비스 타입 (`ClusterIP`, `NodePort`) |
-| `servicePort` | int32 | No | - | NodePort 서비스 포트 번호 |
+| `serviceType` | [ServiceType](#servicetype) | **Yes** | `ClusterIP` | 서비스 타입 (`ClusterIP`, `NodePort`) |
+| `servicePort` | int32 | No | - | NodePort 서비스 포트 번호 (serviceType이 NodePort인 경우) |
 
-#### CMSServiceConfig
+#### CMSService
 
 CMS 서비스 설정을 정의합니다.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `enabled` | boolean | No | `false` | CMS 서비스 활성화 여부 |
-| `startPort` | int32 | No | `31000` | CMS 서비스 시작 포트 |
-| `port` | int32 | No | `8001` | CMS 컨테이너 포트 |
+| `type` | string | No | `"NodePort"` | CMS 서비스 타입 (`NodePort`, `Ingress`) |
+| `startPort` | int32 | No | `31000` | CMS 서비스 시작 포트 (type=NodePort인 경우) |
+| `port` | int32 | No | `8001` | CMS 포트 |
 
-#### HAPortConfig
+**서비스 타입 설명:**
+- **NodePort**: NodePort 서비스를 생성하여 CMS에 직접 접근
+- **Ingress**: Ingress CMS 서비스를 생성하여 도메인 기반 접근 (Ingress Controller 필요)
 
-HA 포트 설정을 정의합니다.
-
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `port` | int32 | No | `59901` | HA 포트 번호 |
 
 #### Storage
 
@@ -264,7 +265,7 @@ BackupDBStatus는 BackupDB의 관찰된 상태를 정의합니다.
 | Field | Type | Description |
 |-------|------|-------------|
 | `backupStatus` | map[string][PodsStatus](#podsstatus) | 각 파드별 백업 상태 |
-| `combinedStatus` | string | 전체 백업 상태 |
+| `overallStatus` | string | 전체 백업 상태 |
 
 #### PodsStatus
 
@@ -355,7 +356,7 @@ kind: CubridDB
 metadata:
   name: my-cubrid-db
 spec:
-  image: airnet73/cubrid
+  image: cubrid/cubrid
   replication:
     enable: false
   broker:
@@ -380,7 +381,7 @@ spec:
     hamodeType:
       type: master-slave
   cmsService:
-    enabled: true
+    type: "NodePort"
     startPort: 31000
     port: 8001
   broker:
@@ -412,7 +413,7 @@ spec:
         name: ha-cubrid-db
         namespace: default
   cmsService:
-    enabled: true
+    type: "NodePort"
     startPort: 32000
     port: 8001
   broker:

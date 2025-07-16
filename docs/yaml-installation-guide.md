@@ -14,14 +14,14 @@
 GitHub에서 제공하는 매니페스트를 직접 적용하여 설치할 수 있습니다:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/airnet73/helm-charts/main/manifest/cubrid-operator.yaml
+kubectl apply -f https://raw.githubusercontent.com/cubrid/helm-charts/main/manifest/cubrid-operator.yaml
 ```
 
 ### 2. 로컬 파일로 설치
 
 1. 매니페스트 파일 다운로드:
 ```bash
-curl -O https://raw.githubusercontent.com/airnet73/helm-charts/main/manifest/cubrid-operator.yaml
+curl -O https://raw.githubusercontent.com/cubrid/helm-charts/main/manifest/cubrid-operator.yaml
 ```
 
 2. 설치:
@@ -46,7 +46,7 @@ kubectl get services -n cubrid
 
 ```bash
 # GitHub 매니페스트로 제거
-kubectl delete -f https://raw.githubusercontent.com/airnet73/helm-charts/main/manifest/cubrid-operator.yaml
+kubectl delete -f https://raw.githubusercontent.com/cubrid/helm-charts/main/manifest/cubrid-operator.yaml
 
 # 또는 로컬 파일로 제거
 kubectl delete -f cubrid-operator.yaml

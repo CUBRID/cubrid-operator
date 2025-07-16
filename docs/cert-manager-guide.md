@@ -27,6 +27,10 @@ CUBRID Operator의 webhook 서버는 두 가지 방식으로 TLS 인증서를 �
 2. cert-manager가 정상적으로 동작하는지 확인:
    ```bash
    kubectl get pods -n cert-manager
+   NAME                                       READY   STATUS    RESTARTS   AGE
+   cert-manager-6576cfbf76-9pn96              1/1     Running   0          3d2h
+   cert-manager-cainjector-6fd5bb64d4-vxmgb   1/1     Running   0          3d2h
+   cert-manager-webhook-7f765545b6-6vtn5      1/1     Running   0          3d2h
    ```
 
 ## 배포 방법
@@ -55,16 +59,16 @@ Helm 차트를 사용하여 배포할 때는 `values.yaml`의 `certManagerType` 
 
 1. 내부 cert-manager 사용 (기본값):
    ```bash
-   make deploy IMG=airnet73/operator:latest
+   make deploy IMG=cubrid/operator:latest
    ```
    또는
    ```bash
-   make deploy IMG=airnet73/operator:latest CERT_MANAGER_TYPE=internal
+   make deploy IMG=cubrid/operator:latest CERT_MANAGER_TYPE=internal
    ```
 
 2. 외부 cert-manager 사용:
    ```bash
-   make deploy IMG=airnet73/operator:latest CERT_MANAGER_TYPE=external
+   make deploy IMG=cubrid/operator:latest CERT_MANAGER_TYPE=external
    ```
 
 ## 동작 방식
@@ -116,19 +120,3 @@ Helm 차트를 사용하여 배포할 때는 `values.yaml`의 `certManagerType` 
      renewBefore: 720h0m0s # 30일
    ```
 
-## 문제 해결
-
-1. Webhook 호출 실패 시:
-   ```bash
-   # webhook 서버 로그 확인
-   kubectl logs -n cubrid deploy/cubrid-operator-webhook-dep
-
-   # 인증서 Secret 확인
-   kubectl get secret -n cubrid cubrid-operator-webhook-cert
-   ```
-
-2. 외부 cert-manager 사용 시 Certificate 상태 확인:
-   ```bash
-   kubectl get certificate -n cubrid
-   kubectl get issuer -n cubrid
-   ``` 
