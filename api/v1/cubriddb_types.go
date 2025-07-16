@@ -49,7 +49,7 @@ type CubridDBSpec struct {
 	Replication        *Replication                      `json:"replication,omitempty"`
 	Affinity           *Affinity                         `json:"affinty,omitempty"`
 	Broker             []Broker                          `json:"broker,omitempty"`
-	CMSService         *CMSServiceConfig                 `json:"cmsService,omitempty"`
+	CMSService         *CMSService                       `json:"cmsService,omitempty"`
 	HAPort             *HAPortConfig                     `json:"haPort,omitempty"`
 	Image              string                            `json:"image,omitempty"`
 	InitContainerImage string                            `json:"initContainerImage,omitempty"`
@@ -127,15 +127,17 @@ type Broker struct {
 	ServicePort int32 `json:"servicePort,omitempty"`
 }
 
-// CMSServiceConfig defines the configuration for CMS services
-type CMSServiceConfig struct {
-	// Enabled indicates whether CMS service should be created
-	Enabled *bool `json:"enabled,omitempty"`
-	// StartPort is the starting NodePort number for CMS services
+// CMSService defines the configuration for CMS services
+type CMSService struct {
+	// Type determines the CMS service type
+	// +kubebuilder:validation:Enum=NodePort;Ingress
+	Type *string `json:"type,omitempty" webhook:"inmutable"`
+	// StartPort is the starting NodePort number for CMS services (used when type=NodePort)
 	StartPort *int32 `json:"startPort,omitempty"`
 	// Port is the container port number for CMS
 	Port *int32 `json:"port,omitempty"`
 }
+
 
 // HAPortConfig defines the configuration for HA port
 type HAPortConfig struct {
@@ -442,13 +444,13 @@ func (c *CubridDB) InitCMSService() {
 	// Create CMSService only if it is nil
 	if c.Spec.CMSService == nil {
 		cubriddblog.Info("InitCMSService CMSService is nil", "name", c.Name)
-		c.Spec.CMSService = &CMSServiceConfig{}
+		c.Spec.CMSService = &CMSService{}
 	}
 
 	// Set default values only if each field is nil
-	if c.Spec.CMSService.Enabled == nil {
-		enabled := DEF.SVC_CMS_ENABLED
-		c.Spec.CMSService.Enabled = &enabled
+	if c.Spec.CMSService.Type == nil {
+		serviceType := DEF.CMSServiceTypeNodePort
+		c.Spec.CMSService.Type = &serviceType
 	}
 
 	if c.Spec.CMSService.StartPort == nil {
@@ -484,10 +486,15 @@ func (c *CubridDB) GetCMSStartPort() int32 {
 
 // IsCMSEnabled returns whether CMS service is enabled
 func (c *CubridDB) IsCMSEnabled() bool {
-	if c.Spec.CMSService == nil || c.Spec.CMSService.Enabled == nil {
-		return DEF.SVC_CMS_ENABLED
+	return c.Spec.CMSService != nil
+}
+
+// GetCMSServiceType returns the CMS service type
+func (c *CubridDB) GetCMSServiceType() string {
+	if c.Spec.CMSService == nil || c.Spec.CMSService.Type == nil {
+		return DEF.CMSServiceTypeNodePort
 	}
-	return *c.Spec.CMSService.Enabled
+	return *c.Spec.CMSService.Type
 }
 
 func (c *CubridDB) InitHAPort() {

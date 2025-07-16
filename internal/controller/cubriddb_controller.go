@@ -107,15 +107,26 @@ func (r *CubridDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("failed to create service manager")
 	}
 
-	// Reconcile all services
+	// Reconcile services based on CMS type
 	if err := serviceManager.ReconcileServices(ctx, &cubridDB); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Create Ingress for CMS connect
-	ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
-	if err := ingressManager.ReconcileIngress(ctx, &cubridDB); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile Ingress: %v", err)
+	// Reconcile CMS services based on type
+	if cubridDB.IsCMSEnabled() {
+		switch cubridDB.GetCMSServiceType() {
+		case DEF.CMSServiceTypeNodePort:
+			if err := serviceManager.ReconcileNodePortCMSServices(ctx, &cubridDB); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to reconcile NodePort CMS services: %v", err)
+			}
+		case DEF.CMSServiceTypeIngress:
+			ingressManager := manager.NewIngressManager(r.Client, r.Scheme)
+			if err := ingressManager.ReconcileIngressWithServices(ctx, &cubridDB); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to reconcile Ingress with services: %v", err)
+			}
+		default:
+			return ctrl.Result{}, fmt.Errorf("unsupported CMS service type: %s", cubridDB.GetCMSServiceType())
+		}
 	}
 
 	if cubridDB.IsHAEnabled() {

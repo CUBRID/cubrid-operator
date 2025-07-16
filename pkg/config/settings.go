@@ -67,10 +67,13 @@ const (
 	SELECTOR_SUFFIX = "-group"
 
 	// CMS Service
-	SVC_NAME_SUFFIX          = "headless"
-	SVC_CMS_NODEPORT         = "%s-%s-cms-%d" // <cubriddb-name>-<namespace>-cms-<pod-index>
-	SVC_CMS_START_NODE_PORT  = 31000
-	SVC_CMS_ENABLED          = true
+	SVC_NAME_SUFFIX         = "headless"
+	SVC_CMS_NODEPORT        = "%s-%s-cms-%d" // <cubriddb-name>-<namespace>-cms-<pod-index>
+	SVC_CMS_START_NODE_PORT = 31000
+
+	// CMS Service Types
+	CMSServiceTypeNodePort   = "NodePort"
+	CMSServiceTypeIngress    = "Ingress"
 	SVC_TYPE_NODE_PORT       = (corev1.ServiceTypeClusterIP)
 	SVC_TYPE_CLUSTER_IP      = (corev1.ServiceTypeClusterIP)
 	SVC_BR_NAME_QUERY_EDITOR = "cubrid-query-editor"
