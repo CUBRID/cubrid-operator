@@ -1,8 +1,6 @@
 module github.com/cubrid/cubrid-operator
 
-go 1.22.0
-
-toolchain go1.22.3
+go 1.23.11
 
 require (
 	github.com/onsi/ginkgo/v2 v2.19.0
