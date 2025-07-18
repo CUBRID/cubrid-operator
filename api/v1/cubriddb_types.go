@@ -182,7 +182,7 @@ func (s *Storage) ValidateStorage() error {
 	hasStaticProvisioning := s.VolumeClaimTemplate != nil && s.isStaticProvisioning()
 
 	if hasDynamicProvisioning && hasStaticProvisioning {
-		return fmt.Errorf("cannot use both dynamic provisioning (storageClassName) and static provisioning (volumeClaimTemplate with empty storageClassName) for storage: %s", s.Name)
+		return fmt.Errorf("cannot use both dynamic provisioning (storageClassName) and static provisioning (volumeClaimTemplate with empty storageClassName) for storage: %s", s.Name) //nolint:lll
 	}
 
 	// Validate static provisioning configuration

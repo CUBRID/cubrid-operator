@@ -15,7 +15,6 @@ import (
 	cms "github.com/cubrid/cubrid-operator/pkg/cms"
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	"github.com/cubrid/cubrid-operator/pkg/util"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,7 +25,6 @@ func (r *CubridDBReconciler) UpdateCubridDBStatus(
 	client client.Client,
 	cubriddb *cubridv1.CubridDB,
 ) (ctrl.Result, error) {
-
 	var token string
 	var isError bool = false
 	var errCode error
@@ -192,7 +190,6 @@ func parseHANodesStatus(result map[string]interface{}) []string {
 func (r *CubridDBReconciler) loginToCMServer(httpURL, id, passwd, version string) (string, error) {
 	loginCmd := createLoginCommand(id, passwd, version)
 
-
 	resp, err := cms.SendCommand(loginCmd, httpURL)
 	if err != nil {
 		return "", fmt.Errorf("error sending login command: %v", err)
@@ -234,7 +231,6 @@ func (r *CubridDBReconciler) requestHAStatus(httpURL, token string) (map[string]
 		return nil, fmt.Errorf("failed to create ha_status command: %v", err)
 	}
 
-
 	resp, err := cms.SendCommand(command, httpURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send ha_status command: %v", err)
@@ -275,25 +271,6 @@ func createStatusCommand(token string) (*cms.CMSCommand, error) {
 		return nil, fmt.Errorf("invalid empty token")
 	}
 	return cms.CreateHAStatusCommand(token), nil
-}
-
-func (r *CubridDBReconciler) getCredentialsFromSecret(ctx context.Context, secretName, namespace string) (string, string, string, error) {
-	secret := &corev1.Secret{}
-
-	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, secret)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get Secret %s in namespace %s: %v", secretName, namespace, err)
-	}
-
-	username, usernameExists := secret.Data["username"]
-	password, passwordExists := secret.Data["password"]
-	port, portExists := secret.Data["port"]
-
-	if !usernameExists || !passwordExists || !portExists {
-		return "", "", "", fmt.Errorf("username or password not found in Secret %s", secretName)
-	}
-
-	return string(username), string(password), string(port), nil
 }
 
 func (r *CubridDBReconciler) isResponseStatus(response map[string]interface{}) (bool, error) {

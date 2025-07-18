@@ -70,8 +70,10 @@ type ScheduleInfo struct {
 	Namespace string
 }
 
-var backupdblog = log.Log.WithName("BackupDB-Reconciler")
-var cronExprRegex = regexp.MustCompile(`^(\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+)))$`)
+var (
+	backupdblog   = log.Log.WithName("BackupDB-Reconciler")
+	cronExprRegex = regexp.MustCompile(`^(\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+))) (\*|(\d+|(\*/\d+)))$`)
+)
 
 func init() {
 }
@@ -517,8 +519,13 @@ func (r *BackupDBReconciler) execCommandInPod(config *rest.Config, namespace, po
 }
 
 // buildPodExecRequest constructs the Kubernetes REST request for executing the command in the pod
-func (r *BackupDBReconciler) buildPodExecRequest(clientset *kubernetes.Clientset, namespace, podName string, podExecOptions *corev1.PodExecOptions) *rest.Request {
-	return clientset.CoreV1().RESTClient().Post().
+func (r *BackupDBReconciler) buildPodExecRequest(
+	clientset *kubernetes.Clientset,
+	namespace, podName string,
+	podExecOptions *corev1.PodExecOptions,
+) *rest.Request {
+	return clientset.CoreV1().RESTClient().
+		Post().
 		Resource("pods").
 		Name(podName).
 		Namespace(namespace).
@@ -537,7 +544,6 @@ func (r *BackupDBReconciler) executeCommand(req *rest.Request, config *rest.Conf
 		Stdout: stdout,
 		Stderr: stderr,
 	})
-
 	if err != nil {
 		if exitErr, ok := err.(exec.CodeExitError); ok {
 			// Log exit code if available

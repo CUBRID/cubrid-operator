@@ -35,8 +35,10 @@ import (
 )
 
 // log is for logging in this package.
-var cubriddblog = logf.Log.WithName("CubridDB-Webhook")
-var cubClient client.Client
+var (
+	cubriddblog = logf.Log.WithName("CubridDB-Webhook")
+	cubClient   client.Client
+)
 
 // SetupWebhookWithManager will setup the manager to manage the webhooks
 func (c *CubridDB) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -46,7 +48,9 @@ func (c *CubridDB) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
+//nolint:lll
 // +kubebuilder:webhook:path=/mutate-k8s-cubrid-com-v1-cubriddb,mutating=true,failurePolicy=fail,sideEffects=None,groups=k8s.cubrid.com,resources=cubriddbs,verbs=create;update,versions=v1,name=mcubriddb.kb.io,admissionReviewVersions=v1
+
 var _ webhook.Defaulter = &CubridDB{}
 
 func (c *CubridDB) Default() {
@@ -68,6 +72,7 @@ func (c *CubridDB) Default() {
 	}
 }
 
+//nolint:lll
 //+kubebuilder:webhook:path=/validate-k8s-cubrid-com-v1-cubriddb,mutating=false,failurePolicy=fail,sideEffects=None,groups=k8s.cubrid.com,resources=cubriddbs,verbs=create;update,versions=v1,name=vcubriddb.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &CubridDB{}
@@ -135,7 +140,6 @@ func (c *CubridDB) validateCubridDBByRefName() error {
 		err := cubClient.List(context.Background(), existingCubridDBList, &client.ListOptions{
 			Namespace: c.Namespace,
 		})
-
 		if err != nil {
 			return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
 				field.Invalid(field.NewPath("Spec").Child("Replication").Child("HAmodeType").Child("CubridRef").Child("Name"),
@@ -144,11 +148,31 @@ func (c *CubridDB) validateCubridDBByRefName() error {
 		}
 
 		for _, existingCubridDB := range existingCubridDBList.Items {
-			cubriddblog.Info("findCubridDBByRefName", "cubriddb name", existingCubridDB.Name, "CubridRef Name", existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name)
-			if existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name == refName {
-				return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, field.ErrorList{
-					field.Invalid(field.NewPath("spec").Child("replication").Child("cubridRef").Child("name"), refName, "Master-Slave is already referenced by another Replica."),
-				})
+			cubriddblog.Info(
+				"findCubridDBByRefName",
+				"cubriddb name", existingCubridDB.Name,
+				"CubridRef Name",
+				existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name,
+			)
+
+			if existingCubridDB.Name != c.Name && existingCubridDB.Spec.Replication.HAmodeType.CubridRef.Name == refName {
+				return apierrors.NewInvalid(
+					schema.GroupKind{
+						Group: "k8s.cubrid.com",
+						Kind:  "CubridDB",
+					},
+					c.Name,
+					field.ErrorList{
+						field.Invalid(
+							field.NewPath("spec").
+								Child("replication").
+								Child("cubridRef").
+								Child("name"),
+							refName,
+							"Master-Slave is already referenced by another Replica.",
+						),
+					},
+				)
 			}
 		}
 	}

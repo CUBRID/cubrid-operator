@@ -47,6 +47,7 @@ func (r *BackupDB) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
+//nolint:lll
 // +kubebuilder:webhook:path=/mutate-k8s-cubrid-com-v1-backupdb,mutating=true,failurePolicy=fail,sideEffects=None,groups=k8s.cubrid.com,resources=backupdbs,verbs=create;update,versions=v1,name=mbackupdb.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &BackupDB{}
@@ -107,6 +108,7 @@ func (b *BackupDB) initStatus() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
+//nolint:lll
 //+kubebuilder:webhook:path=/validate-k8s-cubrid-com-v1-backupdb,mutating=false,failurePolicy=fail,sideEffects=None,groups=k8s.cubrid.com,resources=backupdbs,verbs=create;update,versions=v1,name=vbackupdb.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &BackupDB{}
@@ -142,7 +144,7 @@ func (b *BackupDB) ValidateCreate() (admission.Warnings, error) {
 	if b.Spec.StorageRef == nil || !isValidStorageType(b.Spec.StorageRef.StorageType) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("storageref").Child("storagetype"),
 			b.Spec.StorageRef.StorageType,
-			"storagetype is incorrect. You must choose one of these four types: database-storage-type, conf-storage-type, backup-storage-type, logs-storage-type."))
+			"storagetype is incorrect. You must choose one of these four types: database-storage-type, conf-storage-type, backup-storage-type, logs-storage-type.")) //nolint:lll
 	}
 
 	if len(allErrs) == 0 {
@@ -171,7 +173,6 @@ func (b *BackupDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error
 	command := b.Spec.Schedules
 
 	if command == nil {
-
 	} else {
 		if command.Args == "" {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("Schedules").Child("args"),
@@ -187,7 +188,6 @@ func (b *BackupDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error
 	}
 
 	if b.Spec.CubridDBRef == nil {
-
 	} else {
 
 		if b.Spec.CubridDBRef.Namespace != oldBackupDB.Spec.CubridDBRef.Namespace {
@@ -206,7 +206,7 @@ func (b *BackupDB) ValidateUpdate(old runtime.Object) (admission.Warnings, error
 	if b.Spec.StorageRef == nil || !isValidStorageType(b.Spec.StorageRef.StorageType) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("storageref").Child("storagetype"),
 			b.Spec.StorageRef.StorageType,
-			"storagetype is incorrect. You must choose one of these four types: database-storage-type, conf-storage-type, backup-storage-type, logs-storage-type."))
+			"storagetype is incorrect. You must choose one of these four types: database-storage-type, conf-storage-type, backup-storage-type, logs-storage-type.")) //nolint:lll
 	}
 
 	if len(allErrs) == 0 {

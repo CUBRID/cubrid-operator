@@ -268,7 +268,13 @@ func (r *BrokerEndpointReconciler) execCommand(pod *corev1.Pod, cmd []string) (s
 }
 
 // updateBrokerEndpointComplete updates the endpoint based on broker status
-func (r *BrokerEndpointReconciler) updateBrokerEndpointComplete(ctx context.Context, cubridDB *cubridv1.CubridDB, broker *cubridv1.Broker, activePodIPs, notReadyPodIPs []corev1.EndpointAddress, port int32) error {
+func (r *BrokerEndpointReconciler) updateBrokerEndpointComplete(
+	ctx context.Context,
+	cubridDB *cubridv1.CubridDB,
+	broker *cubridv1.Broker,
+	activePodIPs, notReadyPodIPs []corev1.EndpointAddress,
+	port int32,
+) error {
 	endpointName := broker.Name
 
 	// Early check: if no pods are available, handle endpoint cleanup

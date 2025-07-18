@@ -25,9 +25,7 @@ type ServiceManager struct {
 	Scheme *runtime.Scheme
 }
 
-var (
-	svclogger = log.Log.WithName("Service")
-)
+var svclogger = log.Log.WithName("Service")
 
 func NewServiceManager(client client.Client, scheme *runtime.Scheme) *ServiceManager {
 	return &ServiceManager{
@@ -159,7 +157,6 @@ func (m *ServiceManager) protectCRManagedService(
 		Name:      serviceName,
 		Namespace: cubridDB.Namespace,
 	}, existingSvc)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Service doesn't exist, create it
@@ -281,7 +278,6 @@ func (m *ServiceManager) reconcileNodePortService(
 		Name:      serviceName,
 		Namespace: namespace,
 	}, existingSvc)
-
 	// If service doesn't exist, create it
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -382,7 +378,6 @@ func (m *ServiceManager) ReconcileIngressCMSServices(ctx context.Context, cubrid
 
 // reconcileNodePortCMSServices manages CMS NodePort services
 func (m *ServiceManager) reconcileNodePortCMSServices(ctx context.Context, cubridDB *cubridv1.CubridDB) error {
-
 	// Get the initial start port once
 	startNodePort := getCMSStartPort(cubridDB)
 	cmsPort := cubridDB.GetCMSPort()

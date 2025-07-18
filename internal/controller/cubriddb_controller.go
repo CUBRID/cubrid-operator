@@ -175,9 +175,11 @@ func (r *CubridDBReconciler) SetupObjectWatcher(mgr ctrl.Manager) error {
 		return err
 	}
 
-	statefulSetInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := statefulSetInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: r.statefulSetDeleted,
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to add StatefulSet event handler: %w", err)
+	}
 
 	// CubridDB Informer: Watches for CubridDB events
 	cubridDBInformer, err := mgr.GetCache().GetInformer(context.Background(), &cubridv1.CubridDB{})
@@ -185,10 +187,12 @@ func (r *CubridDBReconciler) SetupObjectWatcher(mgr ctrl.Manager) error {
 		return err
 	}
 
-	cubridDBInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := cubridDBInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    r.cubridAdded,
 		DeleteFunc: r.cubridDeleted,
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to add CubridDB event handler: %w", err)
+	}
 
 	return nil
 }
@@ -196,7 +200,6 @@ func (r *CubridDBReconciler) SetupObjectWatcher(mgr ctrl.Manager) error {
 func (r *CubridDBReconciler) statefulSetDeleted(obj interface{}) {
 	statefulSet, isStatefulSet := obj.(*appsv1.StatefulSet)
 	if !isStatefulSet {
-
 		return
 	}
 	cubriddblog.V(1).Info("delete statefulset", "statefulset name", statefulSet.Name)
@@ -216,7 +219,6 @@ func (r *CubridDBReconciler) cubridAdded(obj interface{}) {
 
 	if cubriddb.Spec.Replication != nil && cubriddb.Spec.Replication.HAmodeType != nil {
 		if cubriddb.Spec.Replication.HAmodeType.Type == DEF.HA_MASTER_SLAVE_TYPE {
-
 		} else if cubriddb.Spec.Replication.HAmodeType.Type == DEF.HA_REPLICA_TYPE {
 			msCubridDB, err = util.GetCubridDBByName(
 				r.Client,
@@ -252,7 +254,6 @@ func (r *CubridDBReconciler) cubridDeleted(obj interface{}) {
 			r.Client,
 			cubriddb.Namespace,
 			cubriddb.Spec.Replication.HAmodeType.CubridRef.Name)
-
 		if err != nil {
 			cubriddblog.V(1).Info(fmt.Sprintf("Failed to get master CubridDB for replica deletion %s/%s, CubridRef Name %s",
 				cubriddb.Namespace, cubriddb.Name, cubriddb.Spec.Replication.HAmodeType.CubridRef.Name), "error", err.Error())
@@ -275,7 +276,8 @@ func (r *CubridDBReconciler) setSpecDefaults(ctx context.Context, cubriddb *cubr
 }
 
 func (r *CubridDBReconciler) patch(ctx context.Context, cubriddb *cubridv1.CubridDB,
-	patcher func(*cubridv1.CubridDB)) error {
+	patcher func(*cubridv1.CubridDB),
+) error {
 	patch := client.MergeFrom(cubriddb.DeepCopy())
 	patcher(cubriddb)
 	return r.Patch(ctx, cubriddb, patch)

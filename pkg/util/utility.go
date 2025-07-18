@@ -28,7 +28,6 @@ func GetStatefulSetFromPod(k8sClient client.Client, pod *corev1.Pod) (*appsv1.St
 				Namespace: pod.Namespace,
 				Name:      ownerRef.Name,
 			}, statefulSet)
-
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil, fmt.Errorf("statefulset not found: %s", ownerRef.Name)
@@ -54,7 +53,6 @@ func GetCubridDBFromStatefulSet(k8sClient client.Client, statefulSet *appsv1.Sta
 		Namespace: statefulSet.Namespace,
 		Name:      name,
 	}, cubridDB)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CubridDB: %w", err)
 	}
@@ -170,7 +168,6 @@ func RemoveReplicaLink(c *cubridv1.CubridDB, name string) {
 
 // SplitReplicaLink splits ReplicaLink into individual components
 func SplitReplicaLink(c *cubridv1.CubridDB) []string {
-
 	replicaLink := &c.Spec.Replication.HAmodeType.CubridRef.ReplicaLink
 
 	if c.Spec.Replication.HAmodeType.CubridRef.ReplicaLink == "" {

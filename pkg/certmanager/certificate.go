@@ -324,7 +324,7 @@ func (m *Manager) createSelfSignedCertificate() error {
 
 	// Create certificate directory if it doesn't exist
 	logger.Info("creating certificate directory", "certDir", m.config.WebhookCertDir)
-	if err := os.MkdirAll(m.config.WebhookCertDir, 0755); err != nil {
+	if err := os.MkdirAll(m.config.WebhookCertDir, 0o755); err != nil {
 		return err
 	}
 

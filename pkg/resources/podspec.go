@@ -60,8 +60,8 @@ func CreatePodTemplateSpec(
 	securityContext *corev1.PodSecurityContext,
 	volumes []corev1.Volume,
 	affinity *corev1.Affinity,
-	serviceAccountName string) corev1.PodTemplateSpec {
-
+	serviceAccountName string,
+) corev1.PodTemplateSpec {
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
@@ -81,8 +81,8 @@ func CreateContainers(
 	name, image string,
 	securityContext *corev1.SecurityContext,
 	ports []corev1.ContainerPort,
-	volumeMounts []corev1.VolumeMount) corev1.Container {
-
+	volumeMounts []corev1.VolumeMount,
+) corev1.Container {
 	return corev1.Container{
 		Name:            name,
 		Image:           image,

@@ -155,7 +155,6 @@ func (m *IngressManager) createOrUpdateService(ctx context.Context, desiredSvc *
 		Name:      desiredSvc.Name,
 		Namespace: desiredSvc.Namespace,
 	}, existingSvc)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Create new service
@@ -574,7 +573,6 @@ func (m *IngressManager) createOrUpdateIngress(ctx context.Context, ingress *net
 		Name:      ingress.Name,
 		Namespace: ingress.Namespace,
 	}, existing)
-
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			return err
