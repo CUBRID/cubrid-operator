@@ -130,8 +130,9 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
-fmt: ## Run go fmt against code.
-	go fmt ./...
+fmt: gofumpt ## Run gofumpt against code.
+	$(GOFUMPT) -w .
+	
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -157,7 +158,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
+build: manifests generate fmt vet gofumpt ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
 
@@ -281,12 +282,14 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
 ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
+GOFUMPT ?= $(LOCALBIN)/gofumpt-$(GOFUMPT_VERSION)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 ENVTEST_VERSION ?= release-0.17
-GOLANGCI_LINT_VERSION ?= v1.54.2
+GOLANGCI_LINT_VERSION ?= v1.60.0
+GOFUMPT_VERSION ?= v0.8.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -307,6 +310,40 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
+
+# .PHONY: goimports
+# goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
+# $(GOIMPORTS): $(LOCALBIN)
+# 	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,latest)
+
+.PHONY: gofumpt
+gofumpt: $(GOFUMPT) ## Download gofumpt locally if necessary.
+$(GOFUMPT): $(LOCALBIN)
+	@[ -f $(GOFUMPT) ] || { \
+		set -e; \
+		echo "Downloading mvdan.cc/gofumpt@latest" ;\
+		GOBIN=$(LOCALBIN) go install mvdan.cc/gofumpt@latest ;\
+		mv $(LOCALBIN)/gofumpt $(GOFUMPT) ;\
+	}
+
+.PHONY: install-tools
+install-tools: kustomize controller-gen envtest golangci-lint gofumpt ## Install all development tools
+	@echo "All development tools have been installed successfully!"
+
+.PHONY: clean
+clean: ## Clean build artifacts and cache
+	rm -rf bin/
+	go clean -cache
+
+.PHONY: version
+version: ## Show version information
+	@echo "=== Version Information ==="
+	@echo "Project Version: $(VERSION)"
+	@echo "Go Version: $(shell go version)"
+	@echo "Kustomize: $(KUSTOMIZE_VERSION)"
+	@echo "Controller-gen: $(CONTROLLER_TOOLS_VERSION)"
+	@echo "Golangci-lint: $(GOLANGCI_LINT_VERSION)"
+	@echo "Gofumpt: $(GOFUMPT_VERSION)"
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)

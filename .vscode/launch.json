@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Setup Go Environment",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/main.go",
+            "preLaunchTask": "Install Go Tools",
+            "env": {
+                "GOPATH": "/home/cubrid/go",
+                "GOROOT": "/usr/local/go"
+            }
+        }
+    ]
+} 

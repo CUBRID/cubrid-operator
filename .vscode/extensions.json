@@ -1,0 +1,9 @@
+{
+    "recommendations": [
+        "golang.go",
+        "ms-vscode.go",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
+    ]
+} 
