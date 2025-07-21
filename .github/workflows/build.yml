@@ -1,19 +1,39 @@
-name: Build
+name: Go Build
 
 on:
+  push:
+    branches: ["develop"]
   pull_request:
-    branches:
-      - develop
+    branches: ["develop"]
 
 jobs:
   build:
-    runs-on: centos-7
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go 1.23.11
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.23.11'
+          go-version: 1.23.11
+
+      - name: Go Version
+        run: go version
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod tidy
+
       - name: Build
-        run: |
-          go build -v ./... 
+        run: go build ./...
