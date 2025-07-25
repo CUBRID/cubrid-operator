@@ -145,6 +145,31 @@ Create the name of the service account to use
 {{- printf "%s-webhook-service" (include "cubrid-operator.fullname" .) -}}
 {{- end -}}
 
+# secret for webhook
+{{- define "cubrid-operator-webhook.secretName" -}}
+{{- default (printf "%s-webhook-cert" (include "cubrid-operator.fullname" .)) .Values.webhook.secretName -}}
+{{- end -}}
+
+# mutating webhook name
+{{- define "cubrid-operator-webhook.mutatingName" -}}
+{{- printf "%s-webhook-mutating" (include "cubrid-operator.fullname" .) -}}
+{{- end -}}
+
+# validating webhook name
+{{- define "cubrid-operator-webhook.validatingName" -}}
+{{- printf "%s-webhook-validating" (include "cubrid-operator.fullname" .) -}}
+{{- end -}}
+
+# webhook deployment name
+{{- define "cubrid-operator-webhook.deploymentName" -}}
+{{- printf "%s-webhook-dep" (include "cubrid-operator.fullname" .) -}}
+{{- end -}}
+
+# main operator deployment name
+{{- define "cubrid-operator.deploymentName" -}}
+{{- printf "%s-dep" (include "cubrid-operator.fullname" .) -}}
+{{- end -}}
+
 {{/*
 Check if nginx ingress controller exists
 */}}

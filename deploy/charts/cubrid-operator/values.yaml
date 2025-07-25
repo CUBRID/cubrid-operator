@@ -13,7 +13,10 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-namespace: "cubrid"
+namespace: ""
+
+# -- Whether to create the namespace automatically
+createNamespace: false
 
 # -- Whether the operator should watch CRDs only in its own namespace or not.
 currentNamespaceOnly: false

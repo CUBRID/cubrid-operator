@@ -477,7 +477,6 @@ func (g *GroupHAManager) execCommand(
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to execute command: %w, stderr: %s", err, stderr.String())
 	}

@@ -17,5 +17,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "cubrid-operator-webhook.serviceAccountName" . }}
-  namespace: cubrid
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
 {{- end }}

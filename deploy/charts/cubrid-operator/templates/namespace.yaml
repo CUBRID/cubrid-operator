@@ -1,0 +1,13 @@
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "cubrid-operator.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/created-by: {{ include "cubrid-operator.fullname" . }}
+    app.kubernetes.io/part-of: {{ include "cubrid-operator.fullname" . }}
+    app.kubernetes.io/managed-by: Helm
+{{- end }} 

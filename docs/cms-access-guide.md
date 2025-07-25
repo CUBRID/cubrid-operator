@@ -77,7 +77,7 @@ kubectl get svc | grep cms-svc
 
 CUBRID Admin을 사용하여 CMS에 접속할 수 있습니다. CUBRID Admin에서 "서버 등록" 또는 "연결 추가" 기능을 통해 CMS 서버 정보를 입력하세요.
 
-![CUBRID Admin CMS 접속](../assets/cubrid-admin-cms-connect.png)
+![CUBRID Admin CMS 접속](./assets/cubrid-admin-cms-connect.png)
 
 **접속 정보 입력 예시**:
 - **서버 이름**: `my-cubrid-db-cms`

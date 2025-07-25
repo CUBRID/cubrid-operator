@@ -1,5 +1,4 @@
 {{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
-{{ $fullName := include "cubrid-operator.fullname" . }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:

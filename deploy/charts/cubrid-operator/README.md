@@ -83,7 +83,7 @@ The command removes all the Kubernetes components associated with the chart and 
 
 | Name | Description | Value |
 |------|-------------|-------|
-| `image.repository` | Operator image repository | `"airnet73/operator"` |
+| `image.repository` | Operator image repository | `"cubrid/operator"` |
 | `image.tag` | Operator image tag | `"t100"` |
 | `image.pullPolicy` | Image pull policy | `"IfNotPresent"` |
 | `imagePullSecrets` | Image pull secrets | `[]` |
@@ -126,7 +126,7 @@ Manages CUBRID database instances with support for:
 - Single instance deployment
 - High Availability (HA) with master-slave replication
 - Sharding configuration
-- Broker services
+- Broker services with dynamic endpoint management
 - Rolling updates
 
 **Example CubridDB resource:**
@@ -137,7 +137,7 @@ kind: CubridDB
 metadata:
   name: cubrid-single
 spec:
-  image: airnet73/cubrid
+  image: cubrid/cubrid
   initContainerImage: busybox
   imagePullPolicy: Always
   replication:
@@ -161,7 +161,7 @@ kind: CubridDB
 metadata:
   name: ha-ms
 spec:
-  image: airnet73/cubrid
+  image: cubrid/cubrid
   initContainerImage: busybox
   updateStrategy:
     type: RollingUpdate
@@ -248,7 +248,7 @@ kind: CubridDB
 metadata:
   name: my-cubrid-db
 spec:
-  image: airnet73/cubrid
+  image: cubrid/cubrid
   replication:
     enable: false
   broker:

@@ -1,15 +1,14 @@
 {{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
-{{ $fullName := include "cubrid-operator.fullname" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $fullName }}-webhook-dep
+  name: {{ include "cubrid-operator-webhook.deploymentName" . }}
   namespace: {{ .Values.namespace | default .Release.Namespace }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ $fullName }}-webhook-dep
+      app: {{ include "cubrid-operator-webhook.deploymentName" . }}
   template:
     metadata:
       {{- with .Values.webhook.podAnnotations }}
@@ -17,12 +16,12 @@ spec:
         {{ toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        app: {{ $fullName }}-webhook-dep
+        app: {{ include "cubrid-operator-webhook.deploymentName" . }}
         control-plane: controller-manager  
     spec:
       serviceAccountName: {{ include "cubrid-operator-webhook.serviceAccountName" . }}
       containers:
-      - name: {{ $fullName }}-webhook-dep
+      - name: {{ include "cubrid-operator-webhook.deploymentName" . }}
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: Always
         command: ["./manager"]
@@ -32,10 +31,10 @@ spec:
           - --webhook-port={{ .Values.webhook.ports.webhook }}
           - --webhook-service-name={{ include "cubrid-operator-webhook.serviceName" . }}
           - --webhook-namespace={{ .Values.namespace | default .Release.Namespace }}
-          - --webhook-secret-name={{ .Values.webhook.secretName }}
-          - --webhook-mutating-name={{ include "cubrid-operator.fullname" . }}-webhook-mutating
-          - --webhook-validating-name={{ include "cubrid-operator.fullname" . }}-webhook-validating
-          - --webhook-deployment-name={{ $fullName }}-webhook-dep
+          - --webhook-secret-name={{ include "cubrid-operator-webhook.secretName" . }}
+          - --webhook-mutating-name={{ include "cubrid-operator-webhook.mutatingName" . }}
+          - --webhook-validating-name={{ include "cubrid-operator-webhook.validatingName" . }}
+          - --webhook-deployment-name={{ include "cubrid-operator-webhook.deploymentName" . }}
           - --webhook-cert-manager-type={{ .Values.webhook.certManagerType }}
         ports:
         - name: webhook
@@ -59,5 +58,5 @@ spec:
       volumes:
       - name: cert-dir
         secret:
-          secretName: {{ .Values.webhook.secretName }}
+          secretName: {{ include "cubrid-operator-webhook.secretName" . }}
 {{- end }}

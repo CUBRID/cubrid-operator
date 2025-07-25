@@ -1,4 +1,7 @@
 # Adds namespace to all resources.
+# This namespace is used for:
+# 1. make build-installer: Fixed namespace for user deployment (always 'cubrid')
+# 2. make deploy: Can be overridden by NAMESPACE parameter for development/testing
 namespace: cubrid
 
 # Value of this field is prepended to the

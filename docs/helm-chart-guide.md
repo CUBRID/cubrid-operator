@@ -43,11 +43,17 @@ kubectl get crds | grep cubrid
 #### 3. Operator 설치
 
 ```bash
-# 기본 설정으로 설치
+# 기본 설정으로 설치 (default namespace)
 helm install cubrid-operator cubrid/cubrid-operator
 
+# 특정 namespace에 설치 (namespace가 없으면 자동 생성)
+helm install cubrid-operator cubrid/cubrid-operator --namespace cubrid --create-namespace
+
+# 특정 namespace에 설치 (기존 namespace 사용)
+helm install cubrid-operator cubrid/cubrid-operator --namespace cubrid-prod
+
 # 특정 버전 설치
-helm install cubrid-operator cubrid/cubrid-operator --version <version>
+helm install cubrid-operator cubrid/cubrid-operator --version <version> --namespace cubrid --create-namespace
 ```
 
 ### 방법 2: 로컬 Helm Chart Package 사용
@@ -76,27 +82,60 @@ kubectl get crds | grep cubrid
 #### 3. Operator 설치
 
 ```bash
-# 기본 설정으로 설치
+# 기본 설정으로 설치 (default namespace)
 helm install cubrid-operator ./cubrid-operator-<version>.tgz
 
+# 특정 namespace에 설치 (namespace가 없으면 자동 생성)
+helm install cubrid-operator ./cubrid-operator-<version>.tgz --namespace cubrid --create-namespace
+
+# 특정 namespace에 설치 (기존 namespace 사용)
+helm install cubrid-operator ./cubrid-operator-<version>.tgz --namespace cubrid-prod
+
 # values.yaml 파일 사용
-helm install cubrid-operator ./cubrid-operator -f values.yaml
+helm install cubrid-operator ./cubrid-operator -f values.yaml --namespace cubrid --create-namespace
 ```
 
 ## 사용자 정의 설정
 
 CUBRID Operator의 설치 시 다양한 설정 옵션을 통해 환경에 맞게 커스터마이징할 수 있습니다. 주요 설정 영역은 RBAC 권한 관리와 Webhook 인증서 관리입니다.
 
+### Namespace 관리
+
+CUBRID Operator는 다양한 namespace 관리 방법을 지원합니다:
+
+#### 방법 1: --create-namespace 옵션 사용 (권장)
+```bash
+# namespace가 없으면 자동으로 생성
+helm install cubrid-operator cubrid/cubrid-operator --namespace cubrid --create-namespace
+```
+
+#### 방법 2: 수동으로 namespace 생성
+```bash
+# 1. namespace 수동 생성
+kubectl create namespace cubrid
+
+# 2. Helm chart 설치
+helm install cubrid-operator cubrid/cubrid-operator --namespace cubrid
+```
+
+#### 방법 3: Chart에서 자동 생성
+```bash
+# values.yaml에서 createNamespace: true 설정 후 설치
+helm install cubrid-operator cubrid/cubrid-operator --namespace cubrid --set createNamespace=true
+```
+
 ### RBAC 설정
 
 ```bash
 # User/Editor 권한 포함하여 설치
 helm install cubrid-operator cubrid/cubrid-operator \
+  --namespace cubrid --create-namespace \
   --set rbac.createUserRoles=true \
   --set rbac.createEditorRoles=true
 
 # Viewer 권한 비활성화하여 설치
 helm install cubrid-operator cubrid/cubrid-operator \
+  --namespace cubrid --create-namespace \
   --set rbac.createViewerRoles=false
 ```
 
@@ -107,10 +146,12 @@ CUBRID Operator의 webhook 서버는 두 가지 방식으로 TLS 인증서를 �
 ```bash
 # 외부 cert-manager 사용
 helm install cubrid-operator cubrid/cubrid-operator \
+  --namespace cubrid --create-namespace \
   --set webhook.certManagerType=external
 
 # 내부 cert-manager 사용 (기본값)
 helm install cubrid-operator cubrid/cubrid-operator \
+  --namespace cubrid --create-namespace \
   --set webhook.certManagerType=internal
 ```
 
@@ -142,17 +183,22 @@ helm upgrade cubrid-operator ./cubrid-operator-<new-version>.tgz
 ## 제거
 
 ```bash
-# Operator 제거
-helm uninstall cubrid-operator
+# Operator 제거 (특정 namespace에서)
+helm uninstall cubrid-operator --namespace cubrid
 
 # CRD 제거
 helm uninstall cubrid-operator-crds
+
+# namespace도 함께 제거하려면
+kubectl delete namespace cubrid
 ```
 
 ## Helm 설정 옵션
 
 | 매개변수 | 설명 | 기본값 |
 |----------|------|---------|
+| `namespace` | Operator가 설치될 namespace | `""` (Release.Namespace 사용) |
+| `createNamespace` | Chart에서 namespace 자동 생성 여부 | `false` |
 | `rbac.createUserRoles` | User 권한 생성 여부 | `false` |
 | `rbac.createEditorRoles` | Editor 권한 생성 여부 | `false` |
 | `rbac.createViewerRoles` | Viewer 권한 생성 여부 | `true` |

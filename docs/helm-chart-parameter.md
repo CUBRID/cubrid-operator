@@ -10,7 +10,8 @@
 |------|------|-----|
 | `nameOverride` | common.names.fullname을 부분적으로 재정의하는 문자열 | `""` |
 | `fullnameOverride` | common.names.fullname을 완전히 재정의하는 문자열 | `""` |
-| `namespace` | operator의 네임스페이스 | `"cubrid"` |
+| `namespace` | operator의 네임스페이스 | `""` (Release.Namespace 사용) |
+| `createNamespace` | Chart에서 namespace 자동 생성 여부 | `false` |
 | `currentNamespaceOnly` | operator가 자체 네임스페이스의 CRD만 감시할지 여부 | `false` |
 
 ### Operator 매개변수
@@ -82,4 +83,18 @@
 | 이름 | 설명 | 값 |
 |------|------|-----|
 | `ingress.enabled` | Ingress 활성화 | `true` |
+
+## Namespace 관련 주의사항
+
+### 권한 요구사항
+- namespace 생성에는 cluster-admin 권한이 필요할 수 있습니다
+- 일반 사용자는 기존 namespace에만 배포 가능합니다
+
+### 충돌 방지
+- 이미 존재하는 namespace에 생성하려고 하면 에러가 발생합니다
+- `--create-namespace` 옵션을 사용하면 자동으로 처리됩니다
+
+### 리소스 정리
+- `helm uninstall` 시 namespace는 자동으로 삭제되지 않습니다
+- namespace도 함께 제거하려면 수동으로 `kubectl delete namespace` 명령을 사용해야 합니다
 

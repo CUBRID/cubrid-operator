@@ -1,5 +1,4 @@
 {{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
-{{ $fullName := include "cubrid-operator.fullname" . }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,5 +13,5 @@ spec:
       protocol: TCP
       targetPort: {{ .Values.webhook.ports.webhook }}
   selector:
-    app: {{ $fullName }}-webhook-dep
+    app: {{ include "cubrid-operator-webhook.deploymentName" . }}
 {{- end }}    

@@ -150,11 +150,12 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 	}
 
 	// Configure ServiceAccount
-	// Use one ServiceAccount per namespace
-	serviceAccountName := fmt.Sprintf("cubrid-%s-sa", cubridDB.Namespace)
+	// Use one ServiceAccount per CubridDB instance
+	rbacNames := rbac.GenerateRBACNames(cubridDB)
+	serviceAccountName := rbacNames.ServiceAccountName
 
 	// Create/Manage Role Based Access Control (RBAC) resources
-	if err := rbac.ReconcileRBACResources(r.clientset, cubridDB.Namespace); err != nil {
+	if err := rbac.ReconcileRBACResources(r.clientset, cubridDB); err != nil {
 		return fmt.Errorf("error reconciling RBAC resources: %v", err)
 	}
 

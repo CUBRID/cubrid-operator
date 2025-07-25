@@ -46,6 +46,7 @@ help: ## Display this help.
 
 
 ##@ Helm Chart
+# Default namespace for deployment
 NAMESPACE := cubrid
 
 CRD_DIR := deploy/charts/cubrid-operator-crds/templates
@@ -170,24 +171,9 @@ run: manifests generate fmt vet ## Run a controller from your host.
 run-webhook: manifests generate fmt vet ## Run a webhook server from your host.
 	go run -gcflags "all=-N -l" ./cmd/main.go webhook
 
-# If you wish to build the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager. Usage: make docker-build [registry/image:tag] [PLATFORM=linux/arm64]
-	@if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		if [ -n "$(PLATFORM)" ]; then \
-			$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(filter-out $@,$(MAKECMDGOALS)) . ; \
-		else \
-			$(CONTAINER_TOOL) build -t $(filter-out $@,$(MAKECMDGOALS)) . ; \
-		fi \
-	else \
-		if [ -n "$(PLATFORM)" ]; then \
-			$(CONTAINER_TOOL) build --platform $(PLATFORM) -t ${IMG} . ; \
-		else \
-			$(CONTAINER_TOOL) build -t ${IMG} . ; \
-		fi \
-	fi
+docker-build: ## Build docker image with the manager. Usage: make docker-build [IMG=myregistry/image:tag]
+	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-images
 docker-images: ## List all docker images
@@ -195,32 +181,14 @@ docker-images: ## List all docker images
 	@$(CONTAINER_TOOL) images
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager. Usage: make docker-push [registry/image:tag]
-	@if [ -n "$(filter-out $@,$(MAKECMDGOALS))" ]; then \
-		$(CONTAINER_TOOL) push $(filter-out $@,$(MAKECMDGOALS)) ; \
-	else \
-		$(CONTAINER_TOOL) push ${IMG} ; \
-	fi
+docker-push: ## Push docker image with the manager. Usage: make docker-push [IMG=myregistry/image:tag]
+	$(CONTAINER_TOOL) push ${IMG}
 
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
-	$(CONTAINER_TOOL) buildx use project-v3-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm project-v3-builder
-	rm Dockerfile.cross
+# Note: This project supports Linux platform only.
+# For cross-platform support, consider using docker buildx manually.
 
 .PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
+build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment for users (fixed to cubrid namespace)
 	mkdir -p deploy/manifests
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 ifeq ($(CERT_MANAGER_TYPE),external)
@@ -250,24 +218,29 @@ uninstall-crd: manifests kustomize ## Uninstall CRDs from the K8s cluster specif
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config. Usage: make deploy NAMESPACE=my-namespace
+	@echo "Deploying CUBRID Operator to namespace: $(NAMESPACE)"
+	@$(KUBECTL) create namespace $(NAMESPACE) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+
 ifeq ($(CERT_MANAGER_TYPE),external)
 	cp config/default/kustomization.yaml config/default/kustomization.yaml.bak
 	sed -i 's/#- ..\/certmanager/- ..\/certmanager/' config/default/kustomization.yaml
 	sed -i 's/#- webhookcainjection_patch.yaml/- webhookcainjection_patch.yaml/' config/default/kustomization.yaml
 	sed -i 's/#replacements:/replacements:/' config/default/kustomization.yaml
 	cp config/default/kustomization.yaml config/default/kustomization.yaml.debug
-	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/external/g' | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/external/g' | sed 's/namespace: cubrid/namespace: $(NAMESPACE)/g' | sed 's/--webhook-namespace=cubrid/--webhook-namespace=$(NAMESPACE)/g' | sed 's/^  name: cubrid$$/  name: $(NAMESPACE)/g' | $(KUBECTL) apply -f -
 	mv config/default/kustomization.yaml.bak config/default/kustomization.yaml
 	@echo "Debug version of kustomization.yaml saved as config/default/kustomization.yaml.debug"
 else
-	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/internal/g' | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/default | sed 's/\$$(CERT_MANAGER_TYPE)/internal/g' | sed 's/namespace: cubrid/namespace: $(NAMESPACE)/g' | sed 's/--webhook-namespace=cubrid/--webhook-namespace=$(NAMESPACE)/g' | sed 's/^  name: cubrid$$/  name: $(NAMESPACE)/g' | $(KUBECTL) apply -f -
 endif
 
 .PHONY: undeploy
-undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Usage: make undeploy NAMESPACE=my-namespace. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	@echo "Undeploying CUBRID Operator from namespace: $(NAMESPACE)"
+	$(KUSTOMIZE) build config/default | sed 's/namespace: cubrid/namespace: $(NAMESPACE)/g' | sed 's/--webhook-namespace=cubrid/--webhook-namespace=$(NAMESPACE)/g' | sed 's/^  name: cubrid$$/  name: $(NAMESPACE)/g' | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
 
 ##@ Dependencies
 
@@ -358,3 +331,4 @@ GOBIN=$(LOCALBIN) go install $${package} ;\
 mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
 }
 endef
+
