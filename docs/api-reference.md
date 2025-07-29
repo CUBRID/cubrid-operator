@@ -1,14 +1,14 @@
 # CUBRID Operator API Reference
 
-이 문서는 CUBRID Operator에서 사용하는 Custom Resource Definitions (CRDs)의 API 필드들을 설명합니다.
+## 개요
+
+CUBRID Operator에서 사용하는 Custom Resource Definitions (CRDs)의 API 필드들을 설명합니다.
 
 ## Table of Contents
 
 - [CubridDB](#cubriddb)
   - [CubridDBSpec](#cubriddbspec)
   - [CubridDBStatus](#cubriddbstatus)
-  - [Storage](#storage)
-  - [VolumeClaimTemplate](#volumeclaimtemplate)
 - [BackupDB](#backupdb)
   - [BackupDBSpec](#backupdbspec)
   - [BackupDBStatus](#backupdbstatus)

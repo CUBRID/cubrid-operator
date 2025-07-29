@@ -1,14 +1,16 @@
 # 설치 가이드
 
+## 개요
+
 cubrid-operator를 설치하는 방법은 두 가지가 있습니다:
 
 ## 설치 방법
 
 ### 1. Helm을 사용한 설치
-Helm 차트를 사용하여 cubrid-operator를 설치하려면 [Helm 차트 가이드](./helm-chart-guide.md)를 참조하세요.
+Helm 차트를 사용하여 cubrid-operator를 설치하려면 [Helm 차트 문서](./helm-chart.md)를 참조하세요.
 
 ### 2. 매니페스트를 사용한 설치
-Kubernetes 매니페스트 파일을 직접 적용하여 cubrid-operator를 설치하려면 [매니페스트 설치 가이드](./manifest-installation-guide.md)를 참조하세요.
+Kubernetes 매니페스트 파일을 직접 적용하여 cubrid-operator를 설치하려면 [매니페스트 설치 문서](./manifest-installation.md)를 참조하세요.
 
 ## 권장사항
 

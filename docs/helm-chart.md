@@ -1,6 +1,8 @@
 # Helm Chart 설치 가이드
 
-이 가이드는 Helm 차트를 사용하여 CUBRID Operator를 설치하는 방법을 상세히 설명합니다.
+## 개요
+
+Helm 차트를 사용하여 CUBRID Operator를 설치하는 방법을 상세히 설명합니다.
 
 ## 사전 요구 사항
 
@@ -155,7 +157,7 @@ helm install cubrid-operator cubrid/cubrid-operator \
   --set webhook.certManagerType=internal
 ```
 
-자세한 인증서 관리 설정 방법은 [cert-manager-guide.md](./cert-manager-guide.md)를 참조하세요.
+자세한 인증서 관리 설정 방법은 [Cert Manager 문서](./cert-manager.md)를 참조하세요.
 
 ## 업그레이드
 

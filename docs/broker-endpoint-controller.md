@@ -2,6 +2,8 @@
 
 ## 개요
 
+CUBRID Operator의 BrokerEndpointReconciler에 대해 설명합니다.
+
 `BrokerEndpointReconciler`는 CUBRID Operator의 핵심 컴포넌트 중 하나로, CUBRID 데이터베이스의 브로커 서비스 상태를 모니터링하고 Kubernetes Endpoint 리소스를 동적으로 관리하는 컨트롤러입니다.
 
 ## Broker Endpoint 생성 목적

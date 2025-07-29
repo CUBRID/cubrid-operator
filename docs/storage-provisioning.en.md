@@ -1,52 +1,52 @@
-# CUBRID Operator 스토리지 프로비저닝 가이드
+# CUBRID Operator Storage Provisioning Guide
 
-CUBRID Operator는 두 가지 스토리지 프로비저닝 방식을 지원합니다: **동적 프로비저닝(Dynamic Provisioning)**과 **정적 프로비저닝(Static Provisioning)**.
+CUBRID Operator supports two storage provisioning methods: **Dynamic Provisioning** and **Static Provisioning**.
 
-## 목차
+## Table of Contents
 
-- [개요](#개요)
-- [동적 프로비저닝](#동적-프로비저닝)
-- [정적 프로비저닝](#정적-프로비저닝)
-- [프로비저닝 방식 선택](#프로비저닝-방식-선택)
-- [예시 파일](#예시-파일)
-- [문제 해결](#문제-해결)
+- [Overview](#overview)
+- [Dynamic Provisioning](#dynamic-provisioning)
+- [Static Provisioning](#static-provisioning)
+- [Choosing Provisioning Method](#choosing-provisioning-method)
+- [Example Files](#example-files)
+- [Troubleshooting](#troubleshooting)
 
-## 개요
+## Overview
 
-CUBRID Operator의 스토리지 프로비저닝 방식에 대해 설명합니다.
+The storage provisioning methods of CUBRID Operator are explained.
 
-### 동적 프로비저닝 (Dynamic Provisioning)
-- StorageClass를 사용하여 자동으로 PersistentVolume(PV)을 생성
-- PVC 생성 시 자동으로 PV가 프로비저닝됨
-- 클라우드 환경이나 스토리지 시스템에서 권장되는 방식
+### Dynamic Provisioning
+- Automatically creates PersistentVolume(PV) using StorageClass
+- PV is automatically provisioned when PVC is created
+- Recommended method for cloud environments or storage systems
 
-### 정적 프로비저닝 (Static Provisioning)
-- 관리자가 사전에 PV를 생성하고 관리
-- PVC는 기존 PV에 바인딩됨
-- 온프레미스 환경이나 특정 스토리지 요구사항이 있는 경우 사용
+### Static Provisioning
+- Administrator creates and manages PV in advance
+- PVC is bound to existing PV
+- Used for on-premises environments or specific storage requirements
 
-## 동적 프로비저닝
+## Dynamic Provisioning
 
-### 특징
-- **자동화**: PVC 생성 시 자동으로 PV 생성
-- **확장성**: 필요에 따라 자동으로 스토리지 확장
-- **관리 편의성**: 수동 PV 관리 불필요
+### Characteristics
+- **Automation**: Automatically creates PV when PVC is created
+- **Scalability**: Automatically expands storage as needed
+- **Management Convenience**: No manual PV management required
 
-### 설정 방법
+### Configuration Method
 
-#### 1. StorageClass 확인
-먼저 클러스터에서 사용 가능한 StorageClass를 확인합니다:
+#### 1. Check StorageClass
+First, check available StorageClasses in the cluster:
 
 ```bash
 kubectl get storageclass
 ```
 
-일반적인 StorageClass 예시:
-- `longhorn` (Longhorn 스토리지)
-- `standard` (기본 스토리지)
-- `fast-ssd` (고성능 SSD)
+Common StorageClass examples:
+- `longhorn` (Longhorn storage)
+- `standard` (Default storage)
+- `fast-ssd` (High-performance SSD)
 
-#### 2. CubridDB 설정
+#### 2. CubridDB Configuration
 
 ```yaml
 apiVersion: k8s.cubrid.com/v1
@@ -70,45 +70,45 @@ spec:
           resources:
             requests:
               storage: 10Gi
-          storageClassName: longhorn  # 동적 프로비저닝을 위한 StorageClass
+          storageClassName: longhorn  # StorageClass for dynamic provisioning
   broker:
     - name: broker-svc
       port: 30000
       serviceType: ClusterIP
 ```
 
-#### 3. 적용 및 확인
+#### 3. Apply and Verify
 
 ```bash
-# CubridDB 생성
+# Create CubridDB
 kubectl apply -f cubrid-dynamic.yaml
 
-# PVC 상태 확인
+# Check PVC status
 kubectl get pvc
 
-# PV 상태 확인
+# Check PV status
 kubectl get pv
 
-# 파드 상태 확인
+# Check pod status
 kubectl get pods -l app=cubriddb
 ```
 
-### 동적 프로비저닝 예시 파일
+### Dynamic Provisioning Example File
 
-`config/samples/cubrid-dynamic-provisioning.yaml` 파일을 참조하세요.
+Refer to the `config/samples/cubrid-dynamic-provisioning.yaml` file.
 
-## 정적 프로비저닝
+## Static Provisioning
 
-### 특징
-- **수동 관리**: 관리자가 PV를 사전에 생성
-- **제어 가능**: 정확한 스토리지 위치와 특성 제어
-- **성능 예측**: 미리 정의된 스토리지 성능 보장
+### Characteristics
+- **Manual Management**: Administrator creates PV in advance
+- **Controllable**: Precise control over storage location and characteristics
+- **Predictable Performance**: Guaranteed predefined storage performance
 
-### 설정 방법
+### Configuration Method
 
-#### 1. PersistentVolume 생성
+#### 1. Create PersistentVolume
 
-먼저 사용할 PV를 생성합니다:
+First, create the PV to be used:
 
 ```yaml
 apiVersion: v1
@@ -124,24 +124,24 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: ""  # 빈 문자열 = 정적 프로비저닝
+  storageClassName: ""  # Empty string = static provisioning
   hostPath:
     path: /data/cubrid/database-0
     type: DirectoryOrCreate
 ```
 
-#### 2. 디렉토리 생성 및 권한 설정
+#### 2. Create Directory and Set Permissions
 
-노드에서 디렉토리를 생성하고 권한을 설정합니다:
+Create directory on nodes and set permissions:
 
 ```bash
-# 각 노드에서 실행
+# Run on each node
 sudo mkdir -p /data/cubrid/database-0
 sudo chown 1000:1000 /data/cubrid/database-0
 sudo chmod 755 /data/cubrid/database-0
 ```
 
-#### 3. CubridDB 설정
+#### 3. CubridDB Configuration
 
 ```yaml
 apiVersion: k8s.cubrid.com/v1
@@ -165,7 +165,7 @@ spec:
           resources:
             requests:
               storage: 10Gi
-          storageClassName: ""  # 빈 문자열 = 정적 프로비저닝
+          storageClassName: ""  # Empty string = static provisioning
           selector:
             matchLabels:
               type: cubrid-database
@@ -176,47 +176,47 @@ spec:
       serviceType: ClusterIP
 ```
 
-#### 4. 적용 순서
+#### 4. Application Order
 
 ```bash
-# 1. PV 생성
+# 1. Create PV
 kubectl apply -f cubrid-pv.yaml
 
-# 2. PV 상태 확인
+# 2. Check PV status
 kubectl get pv
 
-# 3. CubridDB 생성
+# 3. Create CubridDB
 kubectl apply -f cubrid-static.yaml
 
-# 4. PVC 상태 확인
+# 4. Check PVC status
 kubectl get pvc
 
-# 5. 파드 상태 확인
+# 5. Check pod status
 kubectl get pods -l app=cubrid-static
 ```
 
-### 정적 프로비저닝 예시 파일
+### Static Provisioning Example Files
 
-- `config/samples/cubrid-static-provisioning.yaml`: CubridDB 설정
-- `config/samples/cubrid-static-pv.yaml`: PV 설정
+- `config/samples/cubrid-static-provisioning.yaml`: CubridDB configuration
+- `config/samples/cubrid-static-pv.yaml`: PV configuration
 
-## 프로비저닝 방식 선택
+## Choosing Provisioning Method
 
-### 동적 프로비저닝을 선택하는 경우
-- 클라우드 환경 (AWS, GCP, Azure)
-- 스토리지 시스템이 자동 프로비저닝을 지원
-- 개발/테스트 환경
-- 빠른 배포가 필요한 경우
+### Choose Dynamic Provisioning when:
+- Cloud environment (AWS, GCP, Azure)
+- Storage system supports automatic provisioning
+- Development/test environment
+- Quick deployment is needed
 
-### 정적 프로비저닝을 선택하는 경우
-- 온프레미스 환경
-- 특정 스토리지 위치나 성능 요구사항
-- 프로덕션 환경에서 정확한 제어 필요
-- 기존 스토리지 인프라 활용
+### Choose Static Provisioning when:
+- On-premises environment
+- Specific storage location or performance requirements
+- Precise control needed in production environment
+- Utilizing existing storage infrastructure
 
-## 예시 파일
+## Example Files
 
-### 동적 프로비저닝 예시
+### Dynamic Provisioning Example
 
 ```yaml
 # config/samples/cubrid-dynamic-provisioning.yaml
@@ -250,7 +250,7 @@ spec:
       serviceType: ClusterIP
 ```
 
-### 정적 프로비저닝 예시
+### Static Provisioning Example
 
 ```yaml
 # config/samples/cubrid-static-provisioning.yaml
@@ -309,9 +309,9 @@ spec:
     type: DirectoryOrCreate
 ```
 
-## 추가 리소스
+## Additional Resources
 
 - [Kubernetes Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
 - [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/)
-- [API Reference](./api-reference.md)
-- [예시 파일](../config/samples/) 
+- [API Reference](./api-reference.en.md)
+- [Example Files](../config/samples/) 

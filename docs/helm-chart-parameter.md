@@ -1,6 +1,8 @@
 # Helm Chart 매개변수
 
-이 문서는 CUBRID Operator Helm Chart의 모든 설정 매개변수에 대한 상세한 설명을 제공합니다. Helm 설치 시 `--set` 플래그나 `values.yaml` 파일을 통해 이러한 매개변수들을 커스터마이징할 수 있습니다.
+## 개요
+
+CUBRID Operator Helm Chart의 모든 설정 매개변수에 대한 상세한 설명을 제공합니다. Helm 설치 시 `--set` 플래그나 `values.yaml` 파일을 통해 이러한 매개변수들을 커스터마이징할 수 있습니다.
 
 ## 매개변수
 

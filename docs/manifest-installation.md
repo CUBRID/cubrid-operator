@@ -1,6 +1,8 @@
 # 매니페스트 설치 가이드
 
-이 가이드는 Kubernetes 매니페스트를 사용하여 CUBRID Operator를 설치하는 방법을 상세히 설명합니다.
+## 개요
+
+Kubernetes 매니페스트를 사용하여 CUBRID Operator를 설치하는 방법을 상세히 설명합니다.
 
 ## 사전 요구 사항
 

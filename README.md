@@ -1,20 +1,20 @@
 # CUBRID Operator
 
-CUBRID Operator´Â Kubernetes¿¡¼­ CUBRID µ¥ÀÌÅÍº£ÀÌ½º¸¦ °ü¸®ÇÏ±â À§ÇÑ operatorÀÔ´Ï´Ù.
+CUBRID OperatorëŠ” Kubernetesì—ì„œ CUBRID ë°ì´í„°ë² ì´ìŠ¤ë¥¼ ê´€ë¦¬í•˜ê¸° ìœ„í•œ operatorì…ë‹ˆë‹¤.
 
-## ÁÖ¿ä ±â´É
+## ì£¼ìš” ê¸°ëŠ¥
 
-- **ÀÚµ¿È­µÈ ¹èÆ÷**: CUBRID µ¥ÀÌÅÍº£ÀÌ½º ÀÎ½ºÅÏ½ºÀÇ ÀÚµ¿ ¹èÆ÷ ¹× ±¸¼º
-- **°í°¡¿ë¼º**: Master-Slave-Replica ±¸Á¶¸¦ ÅëÇÑ °í°¡¿ë¼º Á¦°ø
-- **¹é¾÷ °ü¸®**: ÀÚµ¿È­µÈ ¹é¾÷ ½ºÄÉÁÙ¸µ ¹× °ü¸®
-- **½ºÄÉÀÏ¸µ**: ¼öÆò ¹× ¼öÁ÷ ½ºÄÉÀÏ¸µ Áö¿ø
-- **¸ğ´ÏÅÍ¸µ**: »óÅÂ ¸ğ´ÏÅÍ¸µ
+- **ìë™í™”ëœ ë°°í¬**: CUBRID ë°ì´í„°ë² ì´ìŠ¤ ì¸ìŠ¤í„´ìŠ¤ì˜ ìë™ ë°°í¬ ë° êµ¬ì„±
+- **ê³ ê°€ìš©ì„±**: Master-Slave-Replica êµ¬ì¡°ë¥¼ í†µí•œ ê³ ê°€ìš©ì„± ì œê³µ
+- **ë°±ì—… ê´€ë¦¬**: ìë™í™”ëœ ë°±ì—… ìŠ¤ì¼€ì¤„ë§ ë° ê´€ë¦¬
+- **ìŠ¤ì¼€ì¼ë§**: ìˆ˜í‰ ë° ìˆ˜ì§ ìŠ¤ì¼€ì¼ë§ ì§€ì›
+- **ëª¨ë‹ˆí„°ë§**: ìƒíƒœ ëª¨ë‹ˆí„°ë§
 
-## ºü¸¥ ½ÃÀÛ
+## ë¹ ë¥¸ ì‹œì‘
 
-### 1. Operator ¼³Ä¡
+### 1. Operator ì„¤ì¹˜
 
-#### HelmÀ» »ç¿ëÇÑ ¼³Ä¡ (±ÇÀå)
+#### Helmì„ ì‚¬ìš©í•œ ì„¤ì¹˜ (ê¶Œì¥)
 
 ```bash
 helm repo add cubrid https://cubrid.github.io/helm-charts
@@ -23,13 +23,13 @@ helm install cubrid-operator-crds cubrid/cubrid-operator-crds
 helm install cubrid-operator cubrid/cubrid-operator
 ```
 
-#### Manifest ÆÄÀÏÀ» »ç¿ëÇÑ ¼³Ä¡
+#### Manifest íŒŒì¼ì„ ì‚¬ìš©í•œ ì„¤ì¹˜
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/CUBRID/cubrid-operator/develop/deploy/manifests/cubrid-operator.yaml
 ```
 
-### 2. CUBRID ÀÎ½ºÅÏ½º »ı¼º
+### 2. CUBRID ì¸ìŠ¤í„´ìŠ¤ ìƒì„±
 
 ```bash
 kubectl apply -f - <<EOF
@@ -49,49 +49,50 @@ spec:
 EOF
 ```
 
-ÀÚ¼¼ÇÑ ¼³Ä¡ ¹æ¹ıÀº [¼³Ä¡ °¡ÀÌµå](./docs/installation-guide.md)¸¦ ÂüÁ¶ÇÏ¼¼¿ä.
+ìì„¸í•œ ì„¤ì¹˜ ë°©ë²•ì€ [ì„¤ì¹˜ ë¬¸ì„œ](./docs/installation.md)ë¥¼ ì°¸ì¡°í•˜ì„¸ìš”.
 
-## °³¹ß È¯°æ ¼³Á¤
+## ê°œë°œ í™˜ê²½ ì„¤ì •
 
-ÀÌ ÇÁ·ÎÁ§Æ®´Â ÀÏ°üµÈ °³¹ß È¯°æÀ» À§ÇØ ÇÊ¿äÇÑ Go µµ±¸µéÀº `./bin` Æú´õ¿¡ download µË´Ï´Ù.
+ì´ í”„ë¡œì íŠ¸ëŠ” ì¼ê´€ëœ ê°œë°œ í™˜ê²½ì„ ìœ„í•´ í•„ìš”í•œ Go ë„êµ¬ë“¤ì€ `./bin` í´ë”ì— download ë©ë‹ˆë‹¤.
 
 ### Go tools
 
-- kustomize (v5.3.0) - Kubernetes ¸Å´ÏÆä½ºÆ® °ü¸®
-- controller-gen (v0.14.0) - Kubernetes ÄÁÆ®·Ñ·¯ ÄÚµå »ı¼º
-- envtest (release-0.17) - Å×½ºÆ® È¯°æ ¼³Á¤
-- golangci-lint (v1.54.2) - Go ÄÚµå ¸°ÅÍ
-- gofumpt (v0.8.0) - Go ÄÚµå Æ÷¸ËÅÍ
+- kustomize (v5.3.0) - Kubernetes ë§¤ë‹ˆí˜ìŠ¤íŠ¸ ê´€ë¦¬
+- controller-gen (v0.14.0) - Kubernetes ì»¨íŠ¸ë¡¤ëŸ¬ ì½”ë“œ ìƒì„±
+- envtest (release-0.17) - í…ŒìŠ¤íŠ¸ í™˜ê²½ ì„¤ì •
+- golangci-lint (v1.54.2) - Go ì½”ë“œ ë¦°í„°
+- gofumpt (v0.8.0) - Go ì½”ë“œ í¬ë§·í„°
 
-ÀÚ¼¼ÇÑ °³¹ß È¯°æ ¼³Á¤Àº [°³¹ßÀÚ °¡ÀÌµå](./docs/developer-guide.md)¸¦ ÂüÁ¶ÇÏ¼¼¿ä.
+ìì„¸í•œ ê°œë°œ í™˜ê²½ ì„¤ì •ì€ [ê°œë°œì ë¬¸ì„œ](./docs/developer.md)ë¥¼ ì°¸ì¡°í•˜ì„¸ìš”.
 
 ## CI/CD
 
-ÀÌ ÇÁ·ÎÁ§Æ®´Â GitHub Actions¸¦ ÅëÇØ ÀÚµ¿È­µÈ CI/CD ÆÄÀÌÇÁ¶óÀÎÀ» Á¦°øÇÕ´Ï´Ù.
+ì´ í”„ë¡œì íŠ¸ëŠ” GitHub Actionsë¥¼ í†µí•´ ìë™í™”ëœ CI/CD íŒŒì´í”„ë¼ì¸ì„ ì œê³µí•©ë‹ˆë‹¤.
 
-- **Lint °Ë»ç**: PR »ı¼º ½Ã ÀÚµ¿À¸·Î golangci-lint¿Í gofumpt °Ë»ç ½ÇÇà
-- **ºôµå °ËÁõ**: main ºê·£Ä¡¿¡¼­ ºôµå Å×½ºÆ® ½ÇÇà
+- **Lint ê²€ì‚¬**: PR ìƒì„± ì‹œ ìë™ìœ¼ë¡œ golangci-lintì™€ gofumpt ê²€ì‚¬ ì‹¤í–‰
+- **ë¹Œë“œ ê²€ì¦**: main ë¸Œëœì¹˜ì—ì„œ ë¹Œë“œ í…ŒìŠ¤íŠ¸ ì‹¤í–‰
 
-ÀÚ¼¼ÇÑ ³»¿ëÀº [CI/CD °¡ÀÌµå](./docs/ci-cd-guide.md)¸¦ ÂüÁ¶ÇÏ¼¼¿ä.
-
-
-## ¹®¼­
-
-- [¼³Ä¡ °¡ÀÌµå](./docs/installation-guide.md) - »ó¼¼ÇÑ ¼³Ä¡ ¹æ¹ı
-- [API Reference](./docs/api-reference.md) - CRD API ¹®¼­
-- [°³¹ßÀÚ °¡ÀÌµå](./docs/developer-guide.md) - °³¹ß È¯°æ ¼³Á¤ ¹× ±â¿© ¹æ¹ı
-- [Helm Chart °¡ÀÌµå](./docs/helm-chart-guide.md) - Helm Chart »ç¿ë¹ı
-- [½ºÅä¸®Áö ÇÁ·ÎºñÀú´× °¡ÀÌµå](./docs/storage-provisioning.md) - ½ºÅä¸®Áö ¼³Á¤
-- [¼­ºñ½º °ü¸® °¡ÀÌµå](./docs/service-management.md) - ¼­ºñ½º ±¸¼º
-- [CMS Á¢¼Ó °¡ÀÌµå](./docs/cms-access-guide.md) - CMS ¼­ºñ½º Á¢¼Ó ¹æ¹ı
-- [Broker Endpoint °¡ÀÌµå](./docs/broker-endpoint-controller.md) - ºê·ÎÄ¿ ¿£µåÆ÷ÀÎÆ® °ü¸®
+ìì„¸í•œ ë‚´ìš©ì€ [CI/CD ë¬¸ì„œ](./docs/ci-cd.md)ë¥¼ ì°¸ì¡°í•˜ì„¸ìš”.
 
 
-## ÇÁ·ÎÁ§Æ® Á¤º¸
+## ë¬¸ì„œ
 
-- **¼Ò½º ÄÚµå**: [https://github.com/CUBRID/cubrid-operator](https://github.com/CUBRID/cubrid-operator)
+- [ì„¤ì¹˜ ë¬¸ì„œ](./docs/installation.md) - ìƒì„¸í•œ ì„¤ì¹˜ ë°©ë²•
+- [API Reference](./docs/api-reference.md) - CRD API ë¬¸ì„œ
+- [ê°œë°œì ë¬¸ì„œ](./docs/developer.md) - ê°œë°œ í™˜ê²½ ì„¤ì • ë° ê¸°ì—¬ ë°©ë²•
+- [Helm Chart ë¬¸ì„œ](./docs/helm-chart.md) - Helm Chart ì‚¬ìš©ë²•
+- [ìŠ¤í† ë¦¬ì§€ í”„ë¡œë¹„ì €ë‹ ë¬¸ì„œ](./docs/storage-provisioning.md) - ìŠ¤í† ë¦¬ì§€ ì„¤ì •
+- [ì„œë¹„ìŠ¤ ê´€ë¦¬ ë¬¸ì„œ](./docs/service-management.md) - ì„œë¹„ìŠ¤ êµ¬ì„±
+- [CMS ì ‘ì† ë¬¸ì„œ](./docs/cms-access.md) - CMS ì„œë¹„ìŠ¤ ì ‘ì† ë°©ë²•
+- [Broker Endpoint ë¬¸ì„œ](./docs/broker-endpoint-controller.md) - ë¸Œë¡œì»¤ ì—”ë“œí¬ì¸íŠ¸ ê´€ë¦¬
+- [Cert Manager ë¬¸ì„œ](./docs/cert-manager.md) - Cert Manager ì„¤ì •
+
+
+## í”„ë¡œì íŠ¸ ì •ë³´
+
+- **ì†ŒìŠ¤ ì½”ë“œ**: [https://github.com/CUBRID/cubrid-operator](https://github.com/CUBRID/cubrid-operator)
 - **Helm Charts**: [https://github.com/CUBRID/helm-charts](https://github.com/CUBRID/helm-charts)
 
-## ¶óÀÌ¼±½º
+## ë¼ì´ì„ ìŠ¤
 
-ÀÌ ÇÁ·ÎÁ§Æ®´Â [Apache License 2.0](LICENSE) ÇÏ¿¡ ¹èÆ÷µË´Ï´Ù.
+ì´ í”„ë¡œì íŠ¸ëŠ” [Apache License 2.0](LICENSE) í•˜ì— ë°°í¬ë©ë‹ˆë‹¤.

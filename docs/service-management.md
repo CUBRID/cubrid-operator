@@ -2,6 +2,8 @@
 
 ## 개요
 
+CUBRID Operator의 서비스 관리에 대해 설명합니다.
+
 CUBRID Operator는 CUBRID 데이터베이스 인스턴스를 위한 다양한 서비스를 관리합니다. 모든 서비스는 **CR 기반 관리**를 통해 운영되며, Custom Resource (CR) 명세를 통해 구성하고 수정해야 합니다. `kubectl edit svc`를 통한 직접 수정은 권장되지 않습니다.
 
 ## 서비스 타입

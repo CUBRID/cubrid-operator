@@ -2,6 +2,8 @@
 
 ## 개요
 
+CUBRID Operator의 CMS 서비스 접속 방법에 대해 설명합니다.
+
 CUBRID Operator는 CMS(CUBRID Manager Server)에 접속하는 두 가지 방법을 제공합니다:
 
 ### 서비스 구성 방식

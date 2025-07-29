@@ -1,6 +1,8 @@
 # CI/CD 가이드
 
-이 문서는 cubrid-operator 프로젝트의 CI/CD 파이프라인 구조와 동작 방식을 설명합니다.
+## 개요
+
+cubrid-operator 프로젝트의 CI/CD 파이프라인 구조와 동작 방식을 설명합니다.
 
 ## 전체 구조
 
