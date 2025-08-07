@@ -112,11 +112,12 @@ func (r *StatefulSetManager) ReconcileStatefulSet(ctx context.Context, cubridDB 
 	initContainers := res.CreateInitContainers(cubridDB, copyConfVolumeMountSpecs, recoveryConfVolumeMountSpecs)
 
 	containers := []corev1.Container{
-		res.CreateContainers(cubridDB.Name,
+		res.CreateContainersWithTemplate(cubridDB.Name,
 			cubridDB.Spec.Image,
 			res.ConfigureSecurityContext(DEF.CubridUser, DEF.CubridGroup),
 			res.CreateContainerPorts(ctx, cubridDB),
-			res.CreateVolumeMountsForCubridDB(cubridDB)),
+			res.CreateVolumeMountsForCubridDB(cubridDB),
+			&cubridDB.Spec.ContainerTemplate),
 	}
 
 	volumes := []corev1.Volume{

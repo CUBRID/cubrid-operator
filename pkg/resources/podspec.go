@@ -92,6 +92,33 @@ func CreateContainers(
 	}
 }
 
+func CreateContainersWithTemplate(
+	name, image string,
+	securityContext *corev1.SecurityContext,
+	ports []corev1.ContainerPort,
+	volumeMounts []corev1.VolumeMount,
+	containerTemplate *cubridv1.ContainerTemplate,
+) corev1.Container {
+	container := corev1.Container{
+		Name:            name,
+		Image:           image,
+		SecurityContext: securityContext,
+		Ports:           ports,
+		VolumeMounts:    volumeMounts,
+	}
+
+	if containerTemplate != nil {
+		if containerTemplate.ImagePullPolicy != "" {
+			container.ImagePullPolicy = containerTemplate.ImagePullPolicy
+		}
+		if containerTemplate.Resources != nil {
+			container.Resources = *containerTemplate.Resources
+		}
+	}
+
+	return container
+}
+
 func CreateVolumeMounts(specs []VolumeMountConfig) []corev1.VolumeMount {
 	volumeMounts := make([]corev1.VolumeMount, 0, len(specs))
 
