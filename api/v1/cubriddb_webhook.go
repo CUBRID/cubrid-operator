@@ -20,10 +20,13 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
+	"strings"
 
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -86,6 +89,8 @@ func (c *CubridDB) ValidateCreate() (admission.Warnings, error) {
 		c.validateCubridDBByRefName,
 		c.validateCMSService,
 		c.validateBrokerServicePort,
+		c.validateBrokerServiceType,
+		c.validateImageFormat,
 		c.validateHAPort,
 		c.validateStorageConfiguration,
 	}
@@ -201,25 +206,30 @@ func (c *CubridDB) validateCMSService() error {
 			// to avoid import cycle issues in webhook
 		}
 
-		// Validate startPort (only for NodePort type)
-		if c.Spec.CMSService.StartPort != nil {
-			if *c.Spec.CMSService.StartPort < 30000 || *c.Spec.CMSService.StartPort > 32767 {
-				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spec", "cmsService", "startPort"),
-					*c.Spec.CMSService.StartPort,
-					"startPort must be between 30000 and 32767 (NodePort range)",
-				))
-			}
-		}
+		if c.Spec.CMSService.Type != nil {
+			serviceType := *c.Spec.CMSService.Type
+			if serviceType == DEF.CMSServiceTypeNodePort {
+				// Validate startPort (only for NodePort type)
+				if c.Spec.CMSService.StartPort != nil {
+					if *c.Spec.CMSService.StartPort < 30000 || *c.Spec.CMSService.StartPort > 32767 {
+						allErrs = append(allErrs, field.Invalid(
+							field.NewPath("spec", "cmsService", "startPort"),
+							*c.Spec.CMSService.StartPort,
+							"startPort must be between 30000 and 32767 (NodePort range)",
+						))
+					}
+				}
 
-		// Validate port
-		if c.Spec.CMSService.Port != nil {
-			if *c.Spec.CMSService.Port < 1 || *c.Spec.CMSService.Port > 65535 {
-				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spec", "cmsService", "port"),
-					*c.Spec.CMSService.Port,
-					"port must be between 1 and 65535",
-				))
+				// Validate port
+				if c.Spec.CMSService.Port != nil {
+					if *c.Spec.CMSService.Port < 1 || *c.Spec.CMSService.Port > 65535 {
+						allErrs = append(allErrs, field.Invalid(
+							field.NewPath("spec", "cmsService", "port"),
+							*c.Spec.CMSService.Port,
+							"port must be between 1 and 65535",
+						))
+					}
+				}
 			}
 		}
 	}
@@ -386,6 +396,37 @@ func (c *CubridDB) validateImmutableFields(old *CubridDB) error {
 		}
 	}
 
+	// Validate Storage immutable fields
+	if len(old.Spec.Storage) != len(c.Spec.Storage) {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec").Child("storage"),
+			c.Spec.Storage,
+			"storage configuration cannot be changed after initial creation"))
+	} else {
+		for i, oldStorage := range old.Spec.Storage {
+			if i >= len(c.Spec.Storage) {
+				break
+			}
+			newStorage := c.Spec.Storage[i]
+
+			// Validate StorageClassName is immutable
+			if oldStorage.StorageClassName != newStorage.StorageClassName {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec").Child("storage").Index(i).Child("storageClassName"),
+					newStorage.StorageClassName,
+					"field is immutable"))
+			}
+
+			// Validate VolumeName is immutable
+			if oldStorage.VolumeName != newStorage.VolumeName {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec").Child("storage").Index(i).Child("volumeName"),
+					newStorage.VolumeName,
+					"field is immutable"))
+			}
+		}
+	}
+
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -412,6 +453,146 @@ func (c *CubridDB) validateBrokerServicePort() error {
 		return nil
 	}
 	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
+}
+
+// validateBrokerServiceType checks if the Broker ServiceType is valid
+func (c *CubridDB) validateBrokerServiceType() error {
+	cubriddblog.Info("validateBrokerServiceType", "name", c.Name)
+	var allErrs field.ErrorList
+
+	for i, broker := range c.Spec.Broker {
+		if broker.ServiceType != corev1.ServiceTypeClusterIP && broker.ServiceType != corev1.ServiceTypeNodePort {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec").Child("broker").Index(i).Child("serviceType"),
+				broker.ServiceType,
+				"serviceType must be either 'ClusterIP' or 'NodePort'"))
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
+}
+
+// validateImageFormat checks if the Image and InitContainerImage formats are valid
+func (c *CubridDB) validateImageFormat() error {
+	cubriddblog.Info("validateImageFormat", "name", c.Name)
+	var allErrs field.ErrorList
+
+	// Validate main Image
+	if c.Spec.Image != "" {
+		if err := validateDockerImageFormat(c.Spec.Image); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec").Child("image"),
+				c.Spec.Image,
+				err.Error()))
+		}
+	}
+
+	// Validate InitContainerImage
+	if c.Spec.InitContainerImage != "" {
+		if err := validateDockerImageFormat(c.Spec.InitContainerImage); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec").Child("initContainerImage"),
+				c.Spec.InitContainerImage,
+				err.Error()))
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
+}
+
+// validateDockerImageFormat validates Docker image format
+func validateDockerImageFormat(image string) error {
+	// Check if image is empty
+	if image == "" {
+		return fmt.Errorf("image cannot be empty")
+	}
+
+	// Split image into repository and tag
+	parts := strings.Split(image, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("image must have format 'repository:tag'")
+	}
+
+	repository := parts[0]
+	tag := parts[1]
+
+	// Validate repository
+	if err := validateDockerRepository(repository); err != nil {
+		return fmt.Errorf("invalid repository: %v", err)
+	}
+
+	// Validate tag
+	if err := validateDockerTag(tag); err != nil {
+		return fmt.Errorf("invalid tag: %v", err)
+	}
+
+	return nil
+}
+
+// validateDockerRepository validates Docker repository format
+func validateDockerRepository(repository string) error {
+	if repository == "" {
+		return fmt.Errorf("repository cannot be empty")
+	}
+
+	// Check for valid characters: lowercase letters, numbers, hyphens, underscores, dots, slashes
+	validRepoRegex := regexp.MustCompile(`^[a-z0-9._/-]+$`)
+	if !validRepoRegex.MatchString(repository) {
+		return fmt.Errorf("repository can only contain lowercase letters, numbers, hyphens, underscores, dots, and slashes")
+	}
+
+	// Check if repository starts with slash or ends with slash
+	if strings.HasPrefix(repository, "/") || strings.HasSuffix(repository, "/") {
+		return fmt.Errorf("repository cannot start or end with slash")
+	}
+
+	// Check for consecutive slashes
+	if strings.Contains(repository, "//") {
+		return fmt.Errorf("repository cannot contain consecutive slashes")
+	}
+
+	return nil
+}
+
+// validateDockerTag validates Docker tag format
+func validateDockerTag(tag string) error {
+	if tag == "" {
+		return fmt.Errorf("tag cannot be empty")
+	}
+
+	// Check for valid characters: lowercase letters, numbers, hyphens, underscores, dots
+	validTagRegex := regexp.MustCompile(`^[a-z0-9._-]+$`)
+	if !validTagRegex.MatchString(tag) {
+		return fmt.Errorf("tag can only contain lowercase letters, numbers, hyphens, underscores, and dots")
+	}
+
+	// Check if tag starts with hyphen or dot
+	if strings.HasPrefix(tag, "-") || strings.HasPrefix(tag, ".") {
+		return fmt.Errorf("tag cannot start with hyphen or dot")
+	}
+
+	// Check if tag ends with hyphen or dot
+	if strings.HasSuffix(tag, "-") || strings.HasSuffix(tag, ".") {
+		return fmt.Errorf("tag cannot end with hyphen or dot")
+	}
+
+	// Check for consecutive hyphens or dots
+	if strings.Contains(tag, "--") || strings.Contains(tag, "..") {
+		return fmt.Errorf("tag cannot contain consecutive hyphens or dots")
+	}
+
+	// Check tag length (max 128 characters)
+	if len(tag) > 128 {
+		return fmt.Errorf("tag cannot exceed 128 characters")
+	}
+
+	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -503,6 +684,7 @@ func (c *CubridDB) validateStorageConfiguration() error {
 
 	var allErrs field.ErrorList
 
+	// Validate each storage configuration
 	for i, storage := range c.Spec.Storage {
 		if err := storage.ValidateStorage(); err != nil {
 			allErrs = append(allErrs, field.Invalid(
@@ -511,6 +693,60 @@ func (c *CubridDB) validateStorageConfiguration() error {
 				err.Error(),
 			))
 		}
+
+		// Validate storage name is not empty
+		if storage.Name == "" {
+			allErrs = append(allErrs, field.Required(
+				field.NewPath("spec").Child("storage").Index(i).Child("name"),
+				"storage name is required",
+			))
+		}
+
+		// Validate mount path is not empty
+		if storage.MountPath == "" {
+			allErrs = append(allErrs, field.Required(
+				field.NewPath("spec").Child("storage").Index(i).Child("mountPath"),
+				"mount path is required",
+			))
+		}
+
+		// Validate mount path format (should start with /)
+		if storage.MountPath != "" && !strings.HasPrefix(storage.MountPath, "/") {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec").Child("storage").Index(i).Child("mountPath"),
+				storage.MountPath,
+				"mount path must be an absolute path starting with /",
+			))
+		}
+
+		// Validate size is positive if provided
+		if storage.Size != nil && storage.Size.Cmp(resource.MustParse("0")) <= 0 {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec").Child("storage").Index(i).Child("size"),
+				storage.Size.String(),
+				"storage size must be positive",
+			))
+		}
+
+		// Validate VolumeClaimTemplate if provided
+		if storage.VolumeClaimTemplate != nil {
+			if err := c.validateVolumeClaimTemplate(storage.VolumeClaimTemplate, i); err != nil {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec").Child("storage").Index(i).Child("volumeClaimTemplate"),
+					storage.VolumeClaimTemplate,
+					err.Error(),
+				))
+			}
+		}
+	}
+
+	// Validate unique storage names
+	if err := c.validateUniqueStorageNames(); err != nil {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec").Child("storage"),
+			c.Spec.Storage,
+			err.Error(),
+		))
 	}
 
 	if len(allErrs) == 0 {
@@ -522,4 +758,45 @@ func (c *CubridDB) validateStorageConfiguration() error {
 		c.Name,
 		allErrs,
 	)
+}
+
+// validateVolumeClaimTemplate validates VolumeClaimTemplate configuration
+func (c *CubridDB) validateVolumeClaimTemplate(template *VolumeClaimTemplate, _ int) error {
+	// Validate AccessModes
+	if len(template.AccessModes) == 0 {
+		return fmt.Errorf("access modes are required")
+	}
+
+	// Validate Resources
+	if template.Resources.Requests == nil || len(template.Resources.Requests) == 0 {
+		return fmt.Errorf("resource requests are required")
+	}
+
+	// Validate storage request exists
+	if _, exists := template.Resources.Requests[corev1.ResourceStorage]; !exists {
+		return fmt.Errorf("storage request is required")
+	}
+
+	// Validate storage request is positive
+	storageRequest := template.Resources.Requests[corev1.ResourceStorage]
+	if storageRequest.Cmp(resource.MustParse("0")) <= 0 {
+		return fmt.Errorf("storage request must be positive")
+	}
+
+	return nil
+}
+
+// validateUniqueStorageNames validates that all storage names are unique
+func (c *CubridDB) validateUniqueStorageNames() error {
+	names := make(map[string]bool)
+	for _, storage := range c.Spec.Storage {
+		if storage.Name == "" {
+			continue // Skip empty names as they're handled by other validation
+		}
+		if names[storage.Name] {
+			return fmt.Errorf("duplicate storage name: %s", storage.Name)
+		}
+		names[storage.Name] = true
+	}
+	return nil
 }
