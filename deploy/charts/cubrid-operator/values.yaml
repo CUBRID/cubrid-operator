@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: airnet73/operator
+  repository: cubrid/cubrid-operator
   tag: latest
   pullPolicy: IfNotPresent
 
