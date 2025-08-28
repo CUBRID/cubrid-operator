@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 
 	DEF "github.com/cubrid/cubrid-operator/pkg/config"
@@ -476,124 +475,28 @@ func (c *CubridDB) validateBrokerServiceType() error {
 	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
 }
 
-// validateImageFormat checks if the Image and InitContainerImage formats are valid
+// validateImageFormat checks if the Image and InitContainerImage are valid
 func (c *CubridDB) validateImageFormat() error {
 	cubriddblog.Info("validateImageFormat", "name", c.Name)
 	var allErrs field.ErrorList
 
-	// Validate main Image
-	if c.Spec.Image != "" {
-		if err := validateDockerImageFormat(c.Spec.Image); err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("spec").Child("image"),
-				c.Spec.Image,
-				err.Error()))
-		}
+	// Validate main Image - only check if not empty
+	if c.Spec.Image == "" {
+		allErrs = append(allErrs, field.Required(
+			field.NewPath("spec").Child("image"),
+			"image is required"))
 	}
 
-	// Validate InitContainerImage
+	// Validate InitContainerImage - only check if not empty
 	if c.Spec.InitContainerImage != "" {
-		if err := validateDockerImageFormat(c.Spec.InitContainerImage); err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("spec").Child("initContainerImage"),
-				c.Spec.InitContainerImage,
-				err.Error()))
-		}
+		// Optional field, no validation needed if provided
+		// Let Kubernetes handle the actual image validation during pod creation
 	}
 
 	if len(allErrs) == 0 {
 		return nil
 	}
 	return apierrors.NewInvalid(schema.GroupKind{Group: "k8s.cubrid.com", Kind: "CubridDB"}, c.Name, allErrs)
-}
-
-// validateDockerImageFormat validates Docker image format
-func validateDockerImageFormat(image string) error {
-	// Check if image is empty
-	if image == "" {
-		return fmt.Errorf("image cannot be empty")
-	}
-
-	// Split image into repository and tag
-	parts := strings.Split(image, ":")
-	if len(parts) != 2 {
-		return fmt.Errorf("image must have format 'repository:tag'")
-	}
-
-	repository := parts[0]
-	tag := parts[1]
-
-	// Validate repository
-	if err := validateDockerRepository(repository); err != nil {
-		return fmt.Errorf("invalid repository: %v", err)
-	}
-
-	// Validate tag
-	if err := validateDockerTag(tag); err != nil {
-		return fmt.Errorf("invalid tag: %v", err)
-	}
-
-	return nil
-}
-
-// validateDockerRepository validates Docker repository format
-func validateDockerRepository(repository string) error {
-	if repository == "" {
-		return fmt.Errorf("repository cannot be empty")
-	}
-
-	// Check for valid characters: lowercase letters, numbers, hyphens, underscores, dots, slashes
-	validRepoRegex := regexp.MustCompile(`^[a-z0-9._/-]+$`)
-	if !validRepoRegex.MatchString(repository) {
-		return fmt.Errorf("repository can only contain lowercase letters, numbers, hyphens, underscores, dots, and slashes")
-	}
-
-	// Check if repository starts with slash or ends with slash
-	if strings.HasPrefix(repository, "/") || strings.HasSuffix(repository, "/") {
-		return fmt.Errorf("repository cannot start or end with slash")
-	}
-
-	// Check for consecutive slashes
-	if strings.Contains(repository, "//") {
-		return fmt.Errorf("repository cannot contain consecutive slashes")
-	}
-
-	return nil
-}
-
-// validateDockerTag validates Docker tag format
-func validateDockerTag(tag string) error {
-	if tag == "" {
-		return fmt.Errorf("tag cannot be empty")
-	}
-
-	// Check for valid characters: lowercase letters, numbers, hyphens, underscores, dots
-	validTagRegex := regexp.MustCompile(`^[a-z0-9._-]+$`)
-	if !validTagRegex.MatchString(tag) {
-		return fmt.Errorf("tag can only contain lowercase letters, numbers, hyphens, underscores, and dots")
-	}
-
-	// Check if tag starts with hyphen or dot
-	if strings.HasPrefix(tag, "-") || strings.HasPrefix(tag, ".") {
-		return fmt.Errorf("tag cannot start with hyphen or dot")
-	}
-
-	// Check if tag ends with hyphen or dot
-	if strings.HasSuffix(tag, "-") || strings.HasSuffix(tag, ".") {
-		return fmt.Errorf("tag cannot end with hyphen or dot")
-	}
-
-	// Check for consecutive hyphens or dots
-	if strings.Contains(tag, "--") || strings.Contains(tag, "..") {
-		return fmt.Errorf("tag cannot contain consecutive hyphens or dots")
-	}
-
-	// Check tag length (max 128 characters)
-	if len(tag) > 128 {
-		return fmt.Errorf("tag cannot exceed 128 characters")
-	}
-
-	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
