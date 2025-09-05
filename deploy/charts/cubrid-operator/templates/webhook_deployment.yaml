@@ -1,0 +1,62 @@
+{{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cubrid-operator-webhook.deploymentName" . }}
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "cubrid-operator-webhook.deploymentName" . }}
+  template:
+    metadata:
+      {{- with .Values.webhook.podAnnotations }}
+      annotations:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: {{ include "cubrid-operator-webhook.deploymentName" . }}
+        control-plane: controller-manager  
+    spec:
+      serviceAccountName: {{ include "cubrid-operator-webhook.serviceAccountName" . }}
+      containers:
+      - name: {{ include "cubrid-operator-webhook.deploymentName" . }}
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: Always
+        command: ["./manager"]
+        args:
+          - webhook
+          - --webhook-cert-dir={{ .Values.webhook.certDir }}
+          - --webhook-port={{ .Values.webhook.ports.webhook }}
+          - --webhook-service-name={{ include "cubrid-operator-webhook.serviceName" . }}
+          - --webhook-namespace={{ .Values.namespace | default .Release.Namespace }}
+          - --webhook-secret-name={{ include "cubrid-operator-webhook.secretName" . }}
+          - --webhook-mutating-name={{ include "cubrid-operator-webhook.mutatingName" . }}
+          - --webhook-validating-name={{ include "cubrid-operator-webhook.validatingName" . }}
+          - --webhook-deployment-name={{ include "cubrid-operator-webhook.deploymentName" . }}
+          - --webhook-cert-manager-type={{ .Values.webhook.certManagerType }}
+        ports:
+        - name: webhook
+          containerPort: {{ .Values.webhook.ports.webhook }}
+        - name: probe
+          containerPort: {{ .Values.webhook.ports.probe }}
+        - name: metrics
+          containerPort: {{ .Values.webhook.ports.metrics }}
+        volumeMounts:
+        - name: cert-dir
+          mountPath: {{ .Values.webhook.certDir }}
+          readOnly: true
+        {{- with .Values.webhook.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        livenessProbe:
+          {{- toYaml .Values.webhook.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.webhook.readinessProbe | nindent 10 }}
+      volumes:
+      - name: cert-dir
+        secret:
+          secretName: {{ include "cubrid-operator-webhook.secretName" . }}
+{{- end }}

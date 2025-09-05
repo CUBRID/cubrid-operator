@@ -1,0 +1,157 @@
+# Default values for cubrid-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: cubrid/cubrid-operator
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+namespace: ""
+
+# -- Whether to create the namespace automatically
+createNamespace: false
+
+# -- Whether the operator should watch CRDs only in its own namespace or not.
+currentNamespaceOnly: false
+
+# Webhook Configurations
+webhook:
+  # -- Specifies whether the webhook should be created.
+  enabled: true
+  namespace: ""
+  certDir: /tmp/k8s-webhook-server/serving-certs
+  secretName: cubrid-operator-webhook-cert
+  # -- Certificate manager type (internal or external)
+  certManagerType: internal
+  # -- Certificate configuration when using external cert-manager
+  certificate:
+    # -- Duration of the certificate
+    duration: "8760h" # 1 year
+    # -- Time before expiry to renew the certificate
+    renewBefore: "720h" # 30 days
+    # -- Private key configuration
+    privateKey:
+      algorithm: RSA
+      encoding: PKCS1
+      size: 2048
+  podAnnotations: {}
+  ports:
+    webhook: 8443
+    metrics: 8082
+    probe: 8083
+  
+  # webhook rules for backupdb
+  brules:
+    - apiGroups:
+        - k8s.cubrid.com
+      apiVersions:
+        - v1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - backupdbs
+  
+  # webhook rules for cubriddb
+  crules:
+    - apiGroups:
+        - k8s.cubrid.com
+      apiVersions:
+        - v1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - cubriddbs
+
+  # Pod resources
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  # Probe configuration
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: probe
+      scheme: HTTP
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+    successThreshold: 1
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: probe
+      scheme: HTTP
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+    successThreshold: 1
+
+  serviceAccount:
+    name: ""
+
+  clusterRoleName:
+    name: ""
+
+  clusterRoleBindingName:
+    name: ""    
+
+  serviceName:
+    name: ""
+
+# RBAC Configuration
+rbac:
+  # -- Whether to create user-facing ClusterRoles for CUBRID and Backup DB management
+  createUserRoles: false
+  
+  # -- Whether to create editor ClusterRoles (create, update, delete permissions)
+  createEditorRoles: false
+  
+  # -- Whether to create viewer ClusterRoles (read-only permissions)  
+  createViewerRoles: true
+
+# cubrid operator 
+operator:
+  enabled: true
+  serviceAccount:
+    enabled: true
+    name: ""
+  clusterRoleName:
+    name: ""
+  clusterRoleBindingName:
+    name: ""
+  electionRoleName:
+    name: ""
+  electionRoleBindingName:
+    name: ""
+  cubriddbEditClusterRoleName: 
+    name: ""
+  cubriddbViewClusterRoleName: 
+    name: ""
+  backupdbEditClusterRoleName:
+    name: ""
+  backupdbViewClusterRoleName:
+    name: ""
+  
+  ports:
+    probe: 8081
+
+# Ingress configuration
+ingress:
+  # Enable ingress check for nginx ingress controller
+  enabled: true

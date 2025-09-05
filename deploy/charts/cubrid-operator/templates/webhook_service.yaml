@@ -1,0 +1,17 @@
+{{ if and (not .Values.currentNamespaceOnly) .Values.webhook.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: {{ include "cubrid-operator-webhook.serviceName" . }}
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: {{ .Values.webhook.ports.webhook }}
+  selector:
+    app: {{ include "cubrid-operator-webhook.deploymentName" . }}
+{{- end }}    

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: cubrid-operator-crds
+description: cubrid-operator CRDs
+home: https://github.com/CUBRID/cubrid-operator
+type: application
+version: 1.0.0  # helm chart version
+appVersion: "1.0.0" # cubrid operator version
+kubeVersion: ">=1.29.0-0" # kubernetes version
+maintainers:
+  - email: airnet@cubrid.com # maintainer email
+    name: Dooho Kang # maintainer name
+
+keywords:
+  - cubrid
+  - cubrid HA
+  - cubrid-operator

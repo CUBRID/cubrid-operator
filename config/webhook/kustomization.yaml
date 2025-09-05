@@ -1,0 +1,12 @@
+resources:
+- deployment.yaml
+- service.yaml
+- service_account.yaml
+- cluster_role.yaml
+- cluster_role_binding.yaml
+- mutating_webhook.yaml
+- validating_webhook.yaml
+- webhook_secret.yaml
+
+configurations:
+- kustomizeconfig.yaml

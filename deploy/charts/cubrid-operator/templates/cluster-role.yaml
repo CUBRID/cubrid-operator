@@ -1,0 +1,160 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cubrid-operator.clusterRoleName" . }}
+rules:
+# CUBRID Custom Resources
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs
+  - cubriddbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs/finalizers
+  - cubriddbs/finalizers
+  verbs:
+  - update
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - delete
+- apiGroups:
+  - k8s.cubrid.com
+  resources:
+  - backupdbs/status
+  - cubriddbs/status
+  verbs:
+  - get
+  - patch
+  - update
+  - list
+  - watch
+  - create
+  - delete
+
+# Core Resources
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+# Pod related permissions
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  - pods/exec
+  - pods/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+  - exec
+
+# Service and Endpoint permissions
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - services/finalizers
+  - services/status
+  - endpoints
+  - endpoints/restricted
+  - endpoints/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+# Other core resources
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - secrets
+  - serviceaccounts
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+# Coordination
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+# RBAC
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  - clusterrolebindings
+  - roles
+  - rolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+  - bind
+
+# Ingress permissions
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  - ingressclasses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete

@@ -1,0 +1,28 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - gofumpt
+    - goimports
+    - govet
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - unused
+    - typecheck
+    - gocyclo
+    - goconst
+    - dupl
+    - lll
+    - errcheck
+    - exportloopref
+    - nakedret
+    - unparam
+    - prealloc
+    - misspell
+    - unconvert
+
+linters-settings:
+  lll:
+    line-length: 150

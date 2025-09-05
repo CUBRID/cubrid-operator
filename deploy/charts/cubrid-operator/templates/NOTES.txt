@@ -1,0 +1,4 @@
+cubrid-operator has been successfully deployed!
+
+Not sure what to do next? Check out:
+https://github.com/CUBRID/cubrid-operator

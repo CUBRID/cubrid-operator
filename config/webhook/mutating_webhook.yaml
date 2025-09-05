@@ -1,0 +1,47 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: cubrid-operator-webhook-mutating
+webhooks:
+- name: mbackupdb.kb.io
+  rules:
+  - apiGroups:
+    - k8s.cubrid.com
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - backupdbs
+  clientConfig:
+    service:
+      name: cubrid-operator-webhook-service
+      namespace: cubrid
+      path: /mutate-k8s-cubrid-com-v1-backupdb
+  admissionReviewVersions:
+  - v1
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Fail
+- name: mcubriddb.kb.io
+  rules:
+  - apiGroups:
+    - k8s.cubrid.com
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - cubriddbs
+  clientConfig:
+    service:
+      name: cubrid-operator-webhook-service
+      namespace: cubrid
+      path: /mutate-k8s-cubrid-com-v1-cubriddb
+  admissionReviewVersions:
+  - v1
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Fail 

@@ -1,0 +1,72 @@
+apiVersion: k8s.cubrid.com/v1
+kind: CubridDB
+metadata:
+  labels:
+    app.kubernetes.io/name: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: cubrid-dynamic
+spec:
+  image: cubrid/cubrid
+  initContainerImage: busybox
+  imagePullPolicy: Always
+  replication:
+    enable: true
+    replicas: 2
+  broker:
+  - name: d-broker1-svc
+    port: 30000
+    servicePort: 30200
+    serviceType: NodePort
+  - name: d-broker2-svc
+    port: 33000
+    servicePort: 30201
+    serviceType: NodePort
+  storage:
+    - name: database
+      type: database-storage-type
+      mountPath: /home/cubrid/CUBRID/databases
+      volumeClaimTemplate:
+        metadata:
+          name: database
+        resources:
+          requests:
+            storage: 2Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: longhorn  # Dynamic Provisioning - Naming a StorageClass
+    - name: logs
+      type: logs-storage-type
+      mountPath: /home/cubrid/CUBRID/log
+      volumeClaimTemplate:
+        metadata:
+          name: logs
+        resources:
+          requests:
+            storage: 1Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: longhorn  # Dynamic Provisioning - Naming a StorageClass
+    - name: conf
+      type: conf-storage-type
+      mountPath: /home/cubrid/CUBRID/conf
+      volumeClaimTemplate:
+        metadata:
+          name: conf
+        resources:
+          requests:
+            storage: 1Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: longhorn  # Dynamic Provisioning - Naming a StorageClass
+    - name: backup
+      type: backup-storage-type
+      mountPath: /home/cubrid/CUBRID/backupdb
+      volumeClaimTemplate:
+        metadata:
+          name: backup
+        resources:
+          requests:
+            storage: 1Gi
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: longhorn  # Dynamic Provisioning - Naming a StorageClass

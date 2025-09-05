@@ -1,0 +1,21 @@
+apiVersion: k8s.cubrid.com/v1
+kind: BackupDB
+metadata:
+  labels:
+    app.kubernetes.io/name: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: backupdb-test
+spec:
+  cubridDBRef:
+    names: 
+      - "cubrid-master-0"
+      - "cubrid-master-1"
+      - "cubrid-master-2"
+    namespace: default
+    dbName: demodb
+  schedules:
+    schedule: "46 13 * * *"
+    filepath: "/share/scripts/backupdb.sh"
+    args: "start demodb 0 5"
+  storageRef:
+    storageType: backup-storage-type

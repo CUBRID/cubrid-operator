@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cubrid-s1-headless
+  labels:
+    app: my-app
+spec:
+  clusterIP: None   
+  selector:
+    app: cubrid-s1
+  ports:
+  - name: http
+    port: 41523
+    targetPort: 41523  
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cubrid-s2-headless
+  labels:
+    app: my-app
+spec:
+  clusterIP: None   
+  selector:
+    app: cubrid-s2
+  ports:
+  - name: http
+    port: 41523
+    targetPort: 41523

@@ -1,0 +1,49 @@
+apiVersion: k8s.cubrid.com/v1
+kind: CubridDB
+metadata:
+  labels:
+    app.kubernetes.io/name: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: cubrid-single
+spec:
+  image: cubrid/cubrid:latest
+  initContainerImage: busybox
+  replication:
+    enable: false
+  resources:
+    requests:
+      memory: "32Gi"
+      cpu: "4"
+    limits:
+      memory: "32Gi"
+      cpu: "4"
+  broker:
+  - name: s-broker1-svc
+    port: 30000
+    servicePort: 30100
+    serviceType: NodePort
+  - name: s-broker2-svc
+    port: 33000
+    servicePort: 30101
+    serviceType: NodePort
+  storage:
+  - mountPath: /home/cubrid/CUBRID/databases
+    name: database-storage
+    type: database-storage-type
+    size: 2Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/log
+    name: logs-storage
+    type: logs-storage-type
+    size: 2Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/backupdb
+    name: backupdb-storage
+    type: backup-storage-type
+    size: 2Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/conf
+    name: conf-storage
+    type: conf-storage-type
+    size: 2Gi
+    storageClassName: longhorn    

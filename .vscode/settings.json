@@ -1,0 +1,16 @@
+{
+    "editor.fontSize": 12,
+    "go.formatTool": "./bin/gofumpt-v0.8.0",
+    "go.lintTool": "./bin/golangci-lint-v1.54.2",
+    "go.lintFlags": [
+        "--config=../.golangci.yml"
+    ],
+    "[go]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+                "source.organizeImports": "explicit"
+        }
+    },
+    "go.toolsManagement.autoUpdate": false,
+    "go.toolsManagement.checkForUpdates": "off"
+}

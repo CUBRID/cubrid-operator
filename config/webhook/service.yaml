@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cubrid-operator-webhook-service
+  namespace: cubrid
+  labels:
+    app.kubernetes.io/name: service
+    app.kubernetes.io/instance: webhook
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/created-by: cubrid-operator
+    app.kubernetes.io/part-of: cubrid-operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  ports:
+    - port: 443
+      targetPort: 8443
+  selector:
+    app: cubrid-operator-webhook-dep

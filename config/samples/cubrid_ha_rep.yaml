@@ -1,0 +1,33 @@
+apiVersion: k8s.cubrid.com/v1
+kind: CubridDB
+metadata:
+  name: ha-rep
+
+spec:
+  initContainerImage: busybox 
+  image: cubrid/cubrid
+  updateStrategy:
+    type: "RollingUpdate" 
+    rollingUpdate:
+      partition: 0        
+      maxUnavailable: 3
+  replication:
+    enable: true
+    replicas: 1
+    hamodeType:
+      type: "replica"
+      cubridRef:
+        name: "ha-ms"
+  cmsService:
+    type: Ingress
+    startPort: 31190
+    port: 8001
+  broker:
+  - name: rep-broker1-svc
+    port: 30000
+    servicePort: 30200
+    serviceType: NodePort
+  - name: rep-broker2-svc
+    port: 33000
+    servicePort: 30201
+    serviceType: NodePort

@@ -1,0 +1,15 @@
+# This patch add annotation to admission webhook config and
+# CA bundle injection
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: cubrid-operator-webhook-validating
+  annotations:
+    cert-manager.io/inject-ca-from: cubrid/cubrid-operator-webhook-serving-cert
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: cubrid-operator-webhook-mutating
+  annotations:
+    cert-manager.io/inject-ca-from: cubrid/cubrid-operator-webhook-serving-cert 

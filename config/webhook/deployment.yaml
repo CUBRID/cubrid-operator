@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cubrid-operator-webhook-dep
+  namespace: cubrid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cubrid-operator-webhook-dep
+  template:
+    metadata:
+      labels:
+        app: cubrid-operator-webhook-dep
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: cubrid-operator-webhook-sa
+      containers:
+      - name: cubrid-operator-webhook-dep
+        image: cubrid/cubrid-operator:latest
+        command: ["./manager"]
+        args:
+          - webhook
+          - --webhook-cert-dir=/tmp/k8s-webhook-server/serving-certs
+          - --webhook-port=8443
+          - --webhook-service-name=cubrid-operator-webhook-service
+          - --webhook-namespace=cubrid
+          - --webhook-secret-name=cubrid-operator-webhook-cert
+          - --webhook-mutating-name=cubrid-operator-webhook-mutating
+          - --webhook-validating-name=cubrid-operator-webhook-validating
+          - --webhook-deployment-name=cubrid-operator-webhook-dep
+          - --webhook-cert-manager-type=$(CERT_MANAGER_TYPE)
+        ports:
+        - name: webhook
+          containerPort: 8443
+        - name: probe
+          containerPort: 8083
+        - name: metrics
+          containerPort: 8082
+        volumeMounts:
+        - name: cert-dir
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: probe
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: probe
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 60
+          timeoutSeconds: 1
+          failureThreshold: 1
+          successThreshold: 1
+      volumes:
+      - name: cert-dir
+        secret:
+          secretName: cubrid-operator-webhook-cert 

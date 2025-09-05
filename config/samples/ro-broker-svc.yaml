@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ro-broker-svc
+  namespace: default  # <-- namespace name
+spec:
+  type: NodePort
+  selector:
+    statefulset.kubernetes.io/pod-name: ha-ms-1  # <-- pod name
+  ports:
+    - protocol: TCP
+      port: 33000
+      targetPort: 33000    # <-- ro broker port
+      nodePort: 30001      # <-- nodeport num

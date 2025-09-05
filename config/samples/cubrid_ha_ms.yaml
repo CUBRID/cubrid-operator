@@ -1,0 +1,52 @@
+apiVersion: k8s.cubrid.com/v1
+kind: CubridDB
+metadata:
+  name: ha-ms
+
+spec:
+  initContainerImage: busybox
+  image: cubrid/cubrid:latest
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0        
+      maxUnavailable: 3
+  replication:
+    enable: true
+    replicas: 2
+    hamodeType:
+      type: master-slave
+  cmsService:
+    type: Ingress
+    startPort: 31000
+    port: 8001
+  broker:
+  - name: ms-broker1-svc
+    port: 30000
+    servicePort: 30100
+    serviceType: NodePort
+  - name: ms-broker2-svc
+    port: 33000
+    servicePort: 30101
+    serviceType: NodePort
+  storage:
+  - mountPath: /home/cubrid/CUBRID/databases
+    name: database-storage
+    type: database-storage-type
+    size: 100Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/log
+    name: logs-storage
+    type: logs-storage-type
+    size: 10Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/backupdb
+    name: backupdb-storage
+    type: backup-storage-type
+    size: 1Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/conf
+    name: conf-storage
+    type: conf-storage-type
+    size: 100Mi
+    storageClassName: longhorn

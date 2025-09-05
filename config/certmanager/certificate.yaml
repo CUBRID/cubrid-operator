@@ -1,0 +1,31 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cubrid-operator-webhook-serving-cert
+  namespace: cubrid
+spec:
+  dnsNames:
+  - cubrid-operator-webhook-service.cubrid.svc
+  - cubrid-operator-webhook-service.cubrid.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: cubrid-operator-webhook-selfsigned-issuer
+  secretName: cubrid-operator-webhook-cert
+  duration: 8760h0m0s # 1 year
+  renewBefore: 720h0m0s # 30 days
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: cubrid-operator-webhook-selfsigned-issuer
+  namespace: cubrid
+spec:
+  selfSigned: {} 
