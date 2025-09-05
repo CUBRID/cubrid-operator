@@ -61,16 +61,16 @@ When using the `make deploy` command, you can select the certificate management 
 
 1. Using internal cert-manager (default):
    ```bash
-   make deploy IMG=cubrid/operator:latest
+   make deploy IMG=cubrid/cubrid-operator:latest
    ```
    or
    ```bash
-   make deploy IMG=cubrid/operator:latest CERT_MANAGER_TYPE=internal
+   make deploy IMG=cubrid/cubrid-operator:latest CERT_MANAGER_TYPE=internal
    ```
 
 2. Using external cert-manager:
    ```bash
-   make deploy IMG=cubrid/operator:latest CERT_MANAGER_TYPE=external
+   make deploy IMG=cubrid/cubrid-operator:latest CERT_MANAGER_TYPE=external
    ```
 
 ## Operation Method

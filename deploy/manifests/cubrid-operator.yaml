@@ -1130,7 +1130,7 @@ spec:
       - args: null
         command:
         - /manager
-        image: airnet73/operator:latest
+        image: cubrid/cubrid-operator:latest
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -1192,7 +1192,7 @@ spec:
         - --webhook-cert-manager-type=internal
         command:
         - ./manager
-        image: airnet73/operator:latest
+        image: cubrid/cubrid-operator:latest
         livenessProbe:
           failureThreshold: 3
           httpGet:

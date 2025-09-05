@@ -225,7 +225,7 @@ kind: CubridDB
 metadata:
   name: cubrid-dynamic-example
 spec:
-  image: airnet73/cubrid
+  image: cubrid/cubrid
   initContainerImage: busybox
   replication:
     enable: false
@@ -259,7 +259,7 @@ kind: CubridDB
 metadata:
   name: cubrid-static-example
 spec:
-  image: airnet73/cubrid
+  image: cubrid/cubrid
   initContainerImage: busybox
   replication:
     enable: false

@@ -1,5 +1,5 @@
 #
-#  Copyright 2016 CUBRID Corporation
+#  Copyright 2025 CUBRID Corporation
 # 
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 
 
 # Image URL to use all building/pushing image targets
-IMG ?= cubrid/operator:latest
+IMG ?= cubrid/cubrid-operator:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
 
@@ -76,7 +76,7 @@ CRD_SOURCES := config/crd/bases/k8s.cubrid.com_cubriddbs.yaml config/crd/bases/k
 # Helm Chart Directory and Package Configuration
 CHARTS_DIR := deploy/charts
 HELM_REPO_DIR := helm-repo
-HELM_REPO_URL := https://airnet73.github.io/test-operator
+HELM_REPO_URL := https://helm.cubrid.org/cubrid-operator
 CHARTS := cubrid-operator cubrid-operator-crds
 
 # Helm Package Directory Creation

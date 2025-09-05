@@ -17,7 +17,7 @@ spec:
       serviceAccountName: cubrid-operator-webhook-sa
       containers:
       - name: cubrid-operator-webhook-dep
-        image: airnet73/operator:latest
+        image: cubrid/cubrid-operator:latest
         command: ["./manager"]
         args:
           - webhook

@@ -162,10 +162,10 @@ make version
 make docker-build
 
 # Build with specific version tag
-make docker-build cubrid/operator:latest
+make docker-build cubrid/cubrid-operator:latest
 
 # Or use IMG variable
-make docker-build IMG=cubrid/operator:v1.0.0
+make docker-build IMG=cubrid/cubrid-operator:1.0.0
 ```
 
 **Docker image tag format:**

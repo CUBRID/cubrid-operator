@@ -53,7 +53,7 @@ Detailed descriptions of all configuration parameters for the CUBRID Operator He
 
 | Name | Description | Value |
 |------|-------------|-------|
-| `image.repository` | Operator image repository | `"cubrid/operator"` |
+| `image.repository` | Operator image repository | `"cubrid/cubrid-operator"` |
 | `image.tag` | Operator image tag | `"latest"` |
 | `image.pullPolicy` | Image pull policy | `"IfNotPresent"` |
 | `imagePullSecrets` | Image pull secrets | `[]` |

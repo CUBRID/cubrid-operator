@@ -28,7 +28,7 @@ There are two ways to install CUBRID Operator:
 
 ```bash
 # Add Helm repo
-helm repo add cubrid https://cubrid.github.io/helm-charts
+helm repo add cubrid https://helm.cubrid.org/cubrid-operator
 helm repo update
 ```
 

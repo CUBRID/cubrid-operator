@@ -61,16 +61,16 @@ Helm 차트를 사용하여 배포할 때는 `values.yaml`의 `certManagerType` 
 
 1. 내부 cert-manager 사용 (기본값):
    ```bash
-   make deploy IMG=cubrid/operator:latest
+   make deploy IMG=cubrid/cubrid-operator:latest
    ```
    또는
    ```bash
-   make deploy IMG=cubrid/operator:latest CERT_MANAGER_TYPE=internal
+   make deploy IMG=cubrid/cubrid-operator:latest CERT_MANAGER_TYPE=internal
    ```
 
 2. 외부 cert-manager 사용:
    ```bash
-   make deploy IMG=cubrid/operator:latest CERT_MANAGER_TYPE=external
+   make deploy IMG=cubrid/cubrid-operator:latest CERT_MANAGER_TYPE=external
    ```
 
 ## 동작 방식

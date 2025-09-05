@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: cubrid-s2
 spec:
-  image: airnet73/cubrid
+  image: cubrid/cubrid:latest
   replication:
     enable: false
   broker:

@@ -5,7 +5,7 @@ metadata:
 
 spec:
   initContainerImage: busybox 
-  image: airnet73/cubrid
+  image: cubrid/cubrid
   updateStrategy:
     type: "RollingUpdate" 
     rollingUpdate:

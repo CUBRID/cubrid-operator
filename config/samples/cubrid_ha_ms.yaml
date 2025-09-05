@@ -5,7 +5,7 @@ metadata:
 
 spec:
   initContainerImage: busybox
-  image: airnet73/cubrid
+  image: cubrid/cubrid:latest
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -29,3 +29,24 @@ spec:
     port: 33000
     servicePort: 30101
     serviceType: NodePort
+  storage:
+  - mountPath: /home/cubrid/CUBRID/databases
+    name: database-storage
+    type: database-storage-type
+    size: 100Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/log
+    name: logs-storage
+    type: logs-storage-type
+    size: 10Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/backupdb
+    name: backupdb-storage
+    type: backup-storage-type
+    size: 1Gi
+    storageClassName: longhorn
+  - mountPath: /home/cubrid/CUBRID/conf
+    name: conf-storage
+    type: conf-storage-type
+    size: 100Mi
+    storageClassName: longhorn

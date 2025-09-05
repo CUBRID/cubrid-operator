@@ -53,7 +53,7 @@ CUBRID Operator Helm Chart의 모든 설정 매개변수에 대한 상세한 설
 
 | 이름 | 설명 | 값 |
 |------|------|-----|
-| `image.repository` | Operator 이미지 저장소 | `"cubrid/operator"` |
+| `image.repository` | Operator 이미지 저장소 | `"cubrid/cubrid-operator"` |
 | `image.tag` | Operator 이미지 태그 | `"latest"` |
 | `image.pullPolicy` | 이미지 풀 정책 | `"IfNotPresent"` |
 | `imagePullSecrets` | 이미지 풀 시크릿 | `[]` |

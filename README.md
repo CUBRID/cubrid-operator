@@ -17,7 +17,7 @@ CUBRID Operator는 Kubernetes에서 CUBRID 데이터베이스를 관리하기 �
 #### Helm을 사용한 설치 (권장)
 
 ```bash
-helm repo add cubrid https://cubrid.github.io/helm-charts
+helm repo add cubrid https://helm.cubrid.org/cubrid-operator
 helm repo update
 helm install cubrid-operator-crds cubrid/cubrid-operator-crds
 helm install cubrid-operator cubrid/cubrid-operator

@@ -162,10 +162,10 @@ make version
 make docker-build
 
 # 특정 버전 태그로 빌드
-make docker-build cubrid/operator:latest
+make docker-build cubrid/cubrid-operator:latest
 
 # 또는 IMG 변수 사용
-make docker-build IMG=cubrid/operator:v1.0.0
+make docker-build IMG=cubrid/cubrid-operator:1.0.0
 ```
 
 **Docker 이미지 태그 포맷:**

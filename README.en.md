@@ -17,7 +17,7 @@ CUBRID Operator is an operator for managing CUBRID databases in Kubernetes.
 #### Installation using Helm (Recommended)
 
 ```bash
-helm repo add cubrid https://cubrid.github.io/helm-charts
+helm repo add cubrid https://helm.cubrid.org/cubrid-operator
 helm repo update
 helm install cubrid-operator-crds cubrid/cubrid-operator-crds
 helm install cubrid-operator cubrid/cubrid-operator
