@@ -49,8 +49,6 @@ func (r *BackupDB) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
 //nolint:lll
 // +kubebuilder:webhook:path=/mutate-k8s-cubrid-com-v1-backupdb,mutating=true,failurePolicy=fail,sideEffects=None,groups=k8s.cubrid.com,resources=backupdbs,verbs=create;update,versions=v1,name=mbackupdb.kb.io,admissionReviewVersions=v1
 

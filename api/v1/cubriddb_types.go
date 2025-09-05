@@ -28,9 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ContainerTemplate defines templates to configure Container objects.
 type ContainerTemplate struct {
 	// ImagePullPolicy is the image pull policy. One of `Always`, `Never` or `IfNotPresent`. If not defined, it defaults to `IfNotPresent`.
